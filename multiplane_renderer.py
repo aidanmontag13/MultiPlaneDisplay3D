@@ -1,9 +1,10 @@
 import os
-#os.environ["PYOPENGL_PLATFORM"] = "egl"
+os.environ["PYOPENGL_PLATFORM"] = "egl"
 #os.environ["EGL_PLATFORM"] = "surfaceless"
 
 import cv2
 import pyrender
+from OpenGL import GL
 
 import numpy as np
 import trimesh
@@ -23,6 +24,16 @@ def create_mask_luts():
 
     return [linear_foreground_lut, linear_middleground_lut, linear_background_lut]
 
+import matplotlib.pyplot as plt
+
+def show_lut(lut):
+    for i, color in enumerate("bgr"):
+        plt.plot(lut[:, 0, i], color)
+    plt.show(block=False)
+    plt.waitforbuttonpress()
+    plt.close()
+    
+
 def create_gain_luts(gains):
     """Function to create 3 channel LUTs to color balance and brighten rendered images"""
     gain_luts = []
@@ -30,12 +41,14 @@ def create_gain_luts(gains):
     values = np.arange(256, dtype=np.float32)
 
     for gain in gains:
+        print("gain", gain)
         lut = np.empty((256, 1, 3), dtype=np.uint8)
         for channel, channel_value in enumerate(gain):
+            print("channel value", channel_value)
             lut[:, 0, channel] = np.clip((values / 255.0) * (channel_value ** (1 / 2.2)) * 255.0, 0, 255)
 
         gain_luts.append(lut)
-        
+    
     return gain_luts
 
 def create_mask(depth, head_position, display_distance, lut):
@@ -66,18 +79,16 @@ def warp_image(frame, display_points, camera_position, camera_matrix):
 
     projected_points = (camera_matrix @ camera_points.T).T # apply projection matrix
 
-    points_2d = (projected_points[:, :2] / projected_points[:, 2:3]).astype(np.float32) # normalize to camera space
+    projected_points = (projected_points[:, :2] / projected_points[:, 2:3]).astype(np.float32) # normalize to camera space
 
-    src_pts = np.float32([ # initiialize 2D points (image corners)
+    source_points = np.float32([ # initiialize 2D points (image corners)
         [0, 0],             
         [frame.shape[1], 0], 
         [0, frame.shape[0]],
         [frame.shape[1], frame.shape[0]]
     ])
 
-    print("source points ", src_pts)
-
-    transform_matrix = cv2.getPerspectiveTransform(src_pts, points_2d) # create transformation matrix
+    transform_matrix = cv2.getPerspectiveTransform(projected_points, source_points) # create transformation matrix
 
     out_size = (frame.shape[1], frame.shape[0])
 
@@ -85,15 +96,19 @@ def warp_image(frame, display_points, camera_position, camera_matrix):
 
 class MultiplaneRenderer:
     def __init__(self):
-        self.display_resolution_x = 800
-        self.display_resolution_y = 426
+        self.display_scaler = 0.5
+        self.display_offset = int(round(5 * self.display_scaler)) # pixels
+
+        self.display_resolution_x = int(800 * self.display_scaler)
+        self.display_resolution_y = int(426 * self.display_scaler)
         self.display_width = 0.13596
         self.display_height = 0.0724
         self.meters_to_pixels = self.display_width / self.display_resolution_x
         self.display_distances = [0.0, 0.0724, 0.1448]
 
-        factor = 4.0
-        gains = [(factor * 0.7, factor * 1.0, factor * 1.3), (factor * 0.33, factor * 0.33, factor * 0.33), (factor * 0.7, factor * 1.0, factor * 1.2)]
+        factor = 6.0
+        gains = [(factor * 1.2, factor * 1.0, factor * 0.7), (factor * 0.5, factor * 0.5, factor * 0.5), (factor * 1.5, factor * 1.2, factor * 0.9)]
+        #gains = [(factor * 0, factor * 0, factor * 0), (factor * 1, factor * 1, factor * 1), (factor * 1, factor * 1, factor * 1.0)]
 
         self.gain_luts = create_gain_luts(gains)
 
@@ -121,11 +136,10 @@ class MultiplaneRenderer:
         ])
 
         self.displays = [self.display_1, self.display_2, self.display_3]
-        self.mask_thresholds = [(0.07, 0.07), (0.07, 0.07), (0.07, 0.07)]
 
     def setup_scene(self):
         """ Setup 3D scene with model and camera"""
-        model = trimesh.load('./3Dmodels/enterprise/model.obj') # use trimesh to import geometry
+        model = trimesh.load('./3Dmodels/dino/model.obj') # use trimesh to import geometry
 
         translation_vector = -model.bounding_box.center_mass # move model to center based on verticies
         model.apply_translation(translation_vector)
@@ -136,6 +150,7 @@ class MultiplaneRenderer:
         model.apply_translation((0, 0, -0.0728)) # offset to middle display
 
         mesh = pyrender.Mesh.from_trimesh(model) # intialize in pyrender
+        #mesh = pyrender.Mesh.from_trimesh(model, material=pyrender.MetallicRoughnessMaterial())
 
         self.scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 1.0]) # intialize scene
         self.scene.add(mesh)
@@ -182,11 +197,9 @@ class MultiplaneRenderer:
 
         render_start_time = time.time()
         color, depth = self.renderer.render(self.scene, flags=pyrender.RenderFlags.FLAT) # render scene and depth buffer
-        end_time = time.time()
-        #print("render time", end_time - render_start_time)
 
         end_time = time.time()
-        print("rendering time took", end_time - start_time)
+        #print("rendering time took", end_time - start_time)
 
         return color, depth, head_position, camera_matrix
 
@@ -196,9 +209,14 @@ class MultiplaneRenderer:
         erosion_kernel = np.ones((3, 3), np.uint8) # intiialize erosion kernel to filter aliasing artifacts
         frames = []
         for i, (display_points, display_distance, mask_lut, gain_lut) in enumerate(zip(self.displays, self.display_distances, self.mask_luts, self.gain_luts)):
-            color = cv2.LUT(color, gain_lut) # apply gain lut
+            #show_lut(gain_lut)
+            masked_color = cv2.LUT(color, gain_lut) # apply gain lut
             mask = create_mask(depth, head_position, display_distance, mask_lut) # create mask
-            masked_color = cv2.multiply(color, mask, scale=1.0/255.0) # apply mask
+            masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) # apply mask
+
+            blurred_masked_color = cv2.blur(masked_color, (21,1))
+
+            masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) + cv2.multiply(blurred_masked_color, (255 - mask), scale=1.0/255.0)
 
             if i == 0: # skip warping for first frame, corners are already at image corners
                 projected_frame = masked_color
@@ -209,9 +227,13 @@ class MultiplaneRenderer:
 
             frames.append(projected_frame)
 
-        stacked_frames = np.vstack((frames[0], frames[1], frames[2])) # stack frames
+        offset_array = np.zeros((self.display_offset + 2, self.display_resolution_x, 3), dtype=np.uint8).astype(np.uint8)
+
+        stacked_frames = np.vstack((frames[0], frames[1], frames[2], offset_array)) # stack frames
+
+        stacked_frames = stacked_frames[self.display_offset:]
 
         end_time = time.time()
-        print("compositing time took", end_time - start_time)
+        #print("compositing time took", end_time - start_time)
 
         return stacked_frames
