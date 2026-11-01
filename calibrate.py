@@ -3,6 +3,8 @@ import time
 import numpy as np
 import threading
 
+from picamera2 import Picamera2
+
 class CameraCalibrator:
     def __init__(self, checkerboard_length=5, checkerboard_width=8):
         self.pattern_size = (checkerboard_length, checkerboard_width)
@@ -16,9 +18,18 @@ class CameraCalibrator:
 
         self.criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
-        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        self.camera = Picamera2()
+        config = self.camera.create_preview_configuration(
+            main={"size": (1640, 1232), "format": "RGB888"}
+        )
+        self.camera.configure(config)
 
-        self.frame_dimensions = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH), self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.camera.start()
+        time.sleep(0.5)
+
+        self.frame_dimensions = 1640, 1232
+
+        self.display_dimensions = 800, 426
 
         self.density_sample_size = np.ceil(self.frame_dimensions[0] / 10)
 
@@ -65,7 +76,7 @@ class CameraCalibrator:
 
         for index, value in np.ndenumerate(self.density_map):
 
-            color = (0, value * 64, 0)  # Green intensity based on density
+            color = (0, value * 32, 0)  # Green intensity based on density
             color = np.clip(color, 0, 255)  # Ensure color values are within valid range
 
             density_image[int(index[0] * self.density_sample_size):int((index[0] + 1) * self.density_sample_size),
@@ -76,26 +87,40 @@ class CameraCalibrator:
                 point = image_point.ravel().astype(int)
                 cv2.circle(corners_image, tuple(point), 5, (0, 255, 0), -1)
 
-        corners_image = cv2.addWeighted(corners_image, 0.7, density_image, 0.3, 0)
+        corners_image = cv2.flip(corners_image, 1)
+        density_image = cv2.flip(density_image, 1)
+        corners_image = cv2.resize(corners_image, self.display_dimensions)
+        density_image = cv2.resize(density_image, self.display_dimensions)
+        black = np.zeros_like(corners_image)
 
-        mirrored_density_image = cv2.flip(corners_image, 1)
+        visualizer = np.vstack((density_image, corners_image, black))
 
-        return mirrored_density_image
+        return visualizer
 
     def camera_worker(self):
-        while not self.stop_event.is_set():
-            ret, frame = self.cap.read()
 
-            if not ret:
+        cv2.namedWindow("visualizer", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(
+            "visualizer",
+            cv2.WND_PROP_FULLSCREEN,
+            cv2.WINDOW_FULLSCREEN
+        )
+
+        while not self.stop_event.is_set():
+            frame = self.camera.capture_array()
+
+            if frame is None:
                 print("Failed to capture frame from camera.")
                 continue
+
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
 
             with self.frame_lock:
                 self.latest_frame = frame
 
             corners_frame = self.draw_checkerboard_corners(frame)
 
-            cv2.imshow("Camera Calibration", corners_frame)
+            cv2.imshow("visualizer", corners_frame)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.stop_event.set()

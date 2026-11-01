@@ -2,7 +2,8 @@ numpy
 opencv-python
 onnxruntime
 scikit-image
-ultralytics
-#picamera2
+mediapipe
+picamera2
 pyrender
-trimesh
+PyOpenGL==3.1.6
+trimesh==5.1.0

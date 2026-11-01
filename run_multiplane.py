@@ -15,31 +15,38 @@ class Multiplane:
         self.headtracker.initialize_headtracker()
 
         self.position_lock = threading.Lock()
+        self.head_position = self.headtracker.default_head_position
         self.last_head_position = self.headtracker.default_head_position
         
         self.render_queue = queue.Queue(maxsize=1)
 
     def headtracker_worker(self):
-        alpha = 0.5  # Smoothing factor
 
         while not self.stop_event.is_set():
+            start_time = time.time()
             head_position = self.headtracker.acquire_head_position()
+            end_time = time.time()
+            #print("headtracking took", end_time - start_time, "seconds")
 
             if head_position is not None:
                 with self.position_lock:
 
-                    smoothed_head_position = alpha * head_position + (1 - alpha) * self.last_head_position
-
-                    self.last_head_position = smoothed_head_position
+                    self.head_position = head_position
 
     def renderer_worker(self):
+
+        alpha = 0.5  # Smoothing factor
 
         self.multiplane_renderer.setup_scene()
 
         while not self.stop_event.is_set():
-            if self.last_head_position is not None:
-                head_position = self.last_head_position   
-                renders = self.multiplane_renderer.render_scene(head_position)
+            if self.head_position is not None:
+                head_position = self.head_position   
+
+                smoothed_head_position = alpha * head_position + (1 - alpha) * self.last_head_position
+                self.last_head_position = smoothed_head_position
+
+                renders = self.multiplane_renderer.render_scene(smoothed_head_position)
 
                 if self.render_queue.full():
                     try:
@@ -50,12 +57,12 @@ class Multiplane:
 
     def compositor_worker(self):
     
-        # cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
-        # cv2.setWindowProperty(
-        #     "combined_image",
-        #     cv2.WND_PROP_FULLSCREEN,
-        #     cv2.WINDOW_FULLSCREEN
-        # )
+        cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(
+            "combined_image",
+            cv2.WND_PROP_FULLSCREEN,
+            cv2.WINDOW_FULLSCREEN
+        )
     
         while not self.stop_event.is_set():
             try:
