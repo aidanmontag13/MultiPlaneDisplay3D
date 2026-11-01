@@ -1,5 +1,5 @@
 # Ignore everything inside images/
-images/*
+#images/*
 outputs/*
 venv/
 env/
