@@ -61,12 +61,12 @@ def create_mesh(color, depth, fx, fy, cx, cy):
 
     zf = depth.reshape(-1)
     tz = zf[tris]
-    keep = ((tz.max(1) - tz.min(1)) < 0.003)
+    keep = ((tz.max(1) - tz.min(1)) < 0.005)
     tris = tris[keep]
 
     mesh = trimesh.Trimesh(vertices=verts, faces=tris, process=False)
     mesh.remove_unreferenced_vertices()
-    mesh = mesh.simplify_quadric_decimation(face_count=20000)
+    mesh = mesh.simplify_quadric_decimation(face_count=10000)
 
     x, y, z = mesh.vertices.T
     px = fx * x / z + cx          # pixel column
