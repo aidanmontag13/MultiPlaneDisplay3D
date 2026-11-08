@@ -93,7 +93,7 @@ def warp_image(frame, display_points, camera_position, camera_matrix, pixel_offs
 
 class MultiplaneRenderer:
     def __init__(self):
-        self.display_scaler = 1.0
+        self.display_scaler = 0.5
         self.display_offset = int(round(5 * self.display_scaler)) # pixels
 
         self.display_resolution_x = int(800 * self.display_scaler)
@@ -135,9 +135,16 @@ class MultiplaneRenderer:
 
         self.displays = [self.display_1, self.display_2, self.display_3]
 
-    def setup_scene(self):
+    def setup_scene(self, file_path):
         """ Setup 3D scene with model and camera"""
-        model = trimesh.load('./3Dmodels/enterprise/model.obj') # use trimesh to import geometry
+
+        self.display_scaler = 0.5
+        self.display_offset = int(round(5 * self.display_scaler)) # pixels
+        self.display_resolution_x = int(800 * self.display_scaler)
+        self.display_resolution_y = int(426 * self.display_scaler)
+        self.meters_to_pixels = self.display_width / self.display_resolution_x
+        
+        model = trimesh.load(file_path) # use trimesh to import geometry
         #T = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0])
         #model.apply_transform(T)
 
@@ -238,27 +245,29 @@ class MultiplaneRenderer:
 
         return stacked_frames
 
-    def setup_2D_images(self):
+    def setup_2D_images(self, image_path):
+
+        self.display_scaler = 1.0
+        self.display_offset = int(round(5 * self.display_scaler)) # pixels
+
+        self.display_resolution_x = int(800 * self.display_scaler)
+        self.display_resolution_y = int(426 * self.display_scaler)
+        self.meters_to_pixels = self.display_width / self.display_resolution_x
+        
+
         image, depth = create_2D_planes.estimate(
-            "images/horseshoe.jpg", 
+            image_path, 
             self.display_resolution_x, 
             self.display_resolution_y, 
-            #depth_scale=self.display_height * 3
         )
 
         frames = create_2D_planes.prepare_images(image, depth, self.gain_luts_2D)
-
-        # frames = []
         
-        # for i, (display_distance, mask_lut, gain_lut) in enumerate(zip(self.display_distances, self.mask_luts, self.gain_luts_2D)):
-        #     masked_color = cv2.LUT(image, gain_lut) # apply gain lut
-        #     mask = create_mask(depth, (0,0,0), display_distance, mask_lut) # create mask
-            
-        #     masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) # apply mask
+        black_frame = np.zeros_like(image)
+        flat_frame = np.vstack((image, black_frame, black_frame))
+        flat_frame = cv2.LUT(flat_frame, self.gain_luts_2D[0])
 
-        #     frames.append(masked_color)
-
-        return frames
+        return frames, flat_frame
 
     def composite_2D_frames(self, frames, head_position):
             """Function to convert rendered image into multiplane output"""
@@ -277,7 +286,7 @@ class MultiplaneRenderer:
             ])
 
             for i, (frame, display_points) in enumerate(zip(frames, self.displays)):
-                offset_display_points = display_points - (0,0, self.display_distances[1] / 2)
+                offset_display_points = display_points# - (0,0, self.display_distances[1] / 2)
     
                 projected_frame = warp_image(frame, offset_display_points, head_position, camera_matrix, self.display_offset) # warp image
     

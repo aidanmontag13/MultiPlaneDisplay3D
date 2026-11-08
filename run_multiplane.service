@@ -18,8 +18,8 @@ TimeoutStopSec=10
 KillSignal=SIGTERM
 KillMode=control-group
 
-ExecStart=/home/multiplane/MultiPlaneDisplay/venv/bin/python \
-          /home/multiplane/MultiPlaneDisplay/multiplane_headtracker_2D.py
+ExecStart=/home/multiplane/MultiPlaneDisplay/.venv/bin/python \
+          /home/multiplane/MultiPlaneDisplay3D/run_multiplane.py
 
 Restart=always
 RestartSec=3

@@ -7,6 +7,44 @@ import queue
 import threading
 import os
 import subprocess
+import random
+import glob
+import numpy as np
+
+def find_usb_files():
+    user = "multiplane"
+    media_root = f"/media/{user}"
+
+    image_paths = []
+    model_paths = []
+
+    # Loop over all USB drives
+    for drive in os.listdir(media_root):
+        drive_path = os.path.join(media_root, drive)
+        images_folder = os.path.join(drive_path, "images")
+        models_folder = os.path.join(drive_path, "models")
+
+        if os.path.isdir(images_folder):
+            print(f"Found images folder on USB: {images_folder}")
+
+            # Add all image files (jpg, png, tiff)
+            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff"):
+                image_paths.extend(glob.glob(os.path.join(images_folder, ext)))
+        else:
+            print(f"No images folder found on USB: {drive_path}")
+            continue
+
+        if os.path.isdir(models_folder):
+            print(f"Found models folder on USB: {models_folder}")
+
+            for dirpath, dirnames, filenames in os.walk(models_folder):
+                # Add all model files (obj, glb, fbx)
+                for ext in ("*.obj", "*.glb", ".gltf"):
+                    model_paths.extend(glob.glob(os.path.join(dirpath, ext)))
+        else:
+            print(f"No models folder found on USB: {drive_path}")
+
+    return image_paths, model_paths
 
 class Multiplane:
     def __init__(self):
@@ -19,27 +57,33 @@ class Multiplane:
         self.last_head_position = self.headtracker.default_head_position
         
         self.render_queue = queue.Queue(maxsize=1)
+        self.composite_queue = queue.Queue(maxsize=1)
+
+        self.render_duration = 30.0
+        self.file_start_time = time.time()
+
+        self.flat_frame = None
 
     def headtracker_worker(self):
 
-        while not self.stop_event.is_set():
+        while not self.quit_event.is_set():
             start_time = time.time()
             head_position = self.headtracker.acquire_head_position()
             end_time = time.time()
-            #print("headtracking took", end_time - start_time, "seconds")
+            print("headtracking took", end_time - start_time, "seconds")
 
             if head_position is not None:
                 with self.position_lock:
 
                     self.head_position = head_position
 
-    def renderer_worker(self):
+    def renderer_worker(self, file_path):
 
-        alpha = 0.5  # Smoothing factor
+        alpha = 0.15  # Smoothing factor
 
-        self.multiplane_renderer.setup_scene()
+        self.multiplane_renderer.setup_scene(file_path)
 
-        while not self.stop_event.is_set():
+        while not self.renderer_stop_event.is_set():
             if self.head_position is not None:
                 head_position = self.head_position   
 
@@ -56,15 +100,9 @@ class Multiplane:
                 self.render_queue.put(renders)
 
     def compositor_worker(self):
+        self.flat_frame = None
     
-        cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
-        cv2.setWindowProperty(
-            "combined_image",
-            cv2.WND_PROP_FULLSCREEN,
-            cv2.WINDOW_FULLSCREEN
-        )
-    
-        while not self.stop_event.is_set():
+        while not self.renderer_stop_event.is_set():
             try:
                 renders = self.render_queue.get(timeout=0.02)
             except queue.Empty:
@@ -77,75 +115,145 @@ class Multiplane:
 
             combined_image = self.multiplane_renderer.composite_frames(color, depth, camera_pose, camera_matrix)
             combined_image = cv2.cvtColor(combined_image, cv2.COLOR_RGB2BGR)
-            cv2.imshow("combined_image", combined_image)
+            
+            if self.composite_queue.full():
+                try:
+                    self.composite_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            self.composite_queue.put(combined_image)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                self.stop_event.set()
-                break
-
-    def renderer_2D_worker(self):
-        cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
-        
-        cv2.setWindowProperty(
-            "combined_image",
-            cv2.WND_PROP_FULLSCREEN,
-            cv2.WINDOW_FULLSCREEN
-        )
+    def renderer_2D_worker(self, image_path):
         
         alpha = 0.02  # Smoothing factor
         
-        images = self.multiplane_renderer.setup_2D_images()
+        frames, self.flat_frame = self.multiplane_renderer.setup_2D_images(image_path)
 
-        print("shapes of images:", [img.shape for img in images])
-
-        while not self.stop_event.is_set():
+        while not self.renderer_stop_event.is_set():
             if self.head_position is not None:
                 head_position = self.head_position   
 
                 smoothed_head_position = alpha * head_position + (1 - alpha) * self.last_head_position
                 self.last_head_position = smoothed_head_position
 
-                combined_image = self.multiplane_renderer.composite_2D_frames(images, smoothed_head_position)
+                combined_image = self.multiplane_renderer.composite_2D_frames(frames, smoothed_head_position)
 
-                cv2.imshow("combined_image", combined_image)
+                if self.composite_queue.full():
+                    try:
+                        self.composite_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+                self.composite_queue.put(combined_image)
+
+    def display_worker(self):
+    
+        cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
+        cv2.setWindowProperty(
+            "combined_image",
+            cv2.WND_PROP_FULLSCREEN,
+            cv2.WINDOW_FULLSCREEN
+        )
+
+        timeout_frames = 0
+    
+        while not self.quit_event.is_set():
+            
+            render_time = time.time() - self.file_start_time
+            fade_time = 2.0
+
+            flat_time = 5.0
+            fadein_time = fade_time + flat_time
+
+            try:
+                stacked_image = self.composite_queue.get(timeout=0.02)
+            except queue.Empty:
+                continue
+
+            if self.flat_frame is not None: # for 2D images, have flat to 2.5D transition
+                if render_time < fadein_time:
+                    alpha = flat_time * (fadein_time - render_time) / fadein_time
+                    alpha = np.clip((alpha), 0.0, 1.0)
+
+                    stacked_image = cv2.addWeighted(stacked_image, (1.0-alpha), self.flat_frame, alpha, 0.0)
+
+
+            if render_time > self.render_duration - fade_time: # always fade out for 2D and 3D
+                alpha = np.clip(((self.render_duration - render_time) / fade_time), 0.0, None)
+                stacked_image = (stacked_image * alpha).astype(np.uint8)
+            
+            cv2.imshow("combined_image", stacked_image)
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                self.stop_event.set()
+                self.renderer_stop_event.set()
                 break
 
     def run_mulitplane(self):
 
-        self.stop_event = threading.Event()
+        image_paths, model_paths = find_usb_files()
+
+        file_paths = image_paths + model_paths
+
+        multiplane_start_time = time.time()
+
+        self.quit_event = threading.Event()
+        self.renderer_stop_event = threading.Event()
 
         headtracker_thread = threading.Thread(target=self.headtracker_worker)
-
-        #renderer_thread = threading.Thread(target=self.renderer_worker)
-
-        #compositor_thread = threading.Thread(target=self.compositor_worker)
-
-        renderer_2D_thread = threading.Thread(target=self.renderer_2D_worker)
-
         headtracker_thread.start()
-        #renderer_thread.start()
-        #compositor_thread.start()
 
-        renderer_2D_thread.start()
+        display_thread = threading.Thread(target=self.display_worker)
+        display_thread.start()
 
-        try:
-            while not self.stop_event.is_set():
-                time.sleep(0.1)
+        while time.time() - multiplane_start_time < 3600 and not self.quit_event.is_set(): # run for 1 hour
+            self.renderer_stop_event.clear()   
+            random_file = random.randint(0, len(file_paths) - 1)
 
-        except KeyboardInterrupt:
-            self.stop_event.set()
+            file_path = file_paths[random_file]
+            print("displaying file:", file_path)
 
+            self.file_start_time = time.time()
+
+            if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff")):
+                renderer_thread = threading.Thread(target=self.renderer_2D_worker, args=(file_path,))
+                renderer_thread.start()
+                compositor_thread = None
+
+            if file_path.lower().endswith((".obj", ".glb", ".gltf")):
+                renderer_thread = threading.Thread(target=self.renderer_worker, args=(file_path,))
+                renderer_thread.start()
+
+                compositor_thread = threading.Thread(target=self.compositor_worker)
+                compositor_thread.start()
+
+            try:
+                while not self.renderer_stop_event.is_set() and time.time() - self.file_start_time < self.render_duration: # run each image for 30 seconds
+                    print("time elapsed for current image:", time.time() - self.file_start_time)
+                    time.sleep(0.1)
+
+            except KeyboardInterrupt:
+                self.quit_event.set()
+                self.renderer_stop_event.set()
+
+            print("going to next file")
+
+            self.renderer_stop_event.set()
+
+            renderer_thread.join()
+
+            if compositor_thread is not None:
+                compositor_thread.join()
+
+            time.sleep(0.1)
+        
         headtracker_thread.join()
-        #renderer_thread.join()
-        #compositor_thread.join()
-        renderer_2D_thread.join()
+        display_thread.join()
+        cv2.destroyAllWindows()
+        self.quit_event.set()
         time.sleep(0.1)
         os._exit(0)
 
 def main():
+    subprocess.Popen(["unclutter", "-idle", "0", "-root"])
     try:
         headtracker.read_colmap_file()
     except(FileNotFoundError):
