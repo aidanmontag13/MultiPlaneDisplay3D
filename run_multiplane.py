@@ -83,19 +83,53 @@ class Multiplane:
                 self.stop_event.set()
                 break
 
+    def renderer_2D_worker(self):
+        cv2.namedWindow("combined_image", cv2.WINDOW_NORMAL)
+        
+        cv2.setWindowProperty(
+            "combined_image",
+            cv2.WND_PROP_FULLSCREEN,
+            cv2.WINDOW_FULLSCREEN
+        )
+        
+        alpha = 0.02  # Smoothing factor
+        
+        images = self.multiplane_renderer.setup_2D_images()
+
+        print("shapes of images:", [img.shape for img in images])
+
+        while not self.stop_event.is_set():
+            if self.head_position is not None:
+                head_position = self.head_position   
+
+                smoothed_head_position = alpha * head_position + (1 - alpha) * self.last_head_position
+                self.last_head_position = smoothed_head_position
+
+                combined_image = self.multiplane_renderer.composite_2D_frames(images, smoothed_head_position)
+
+                cv2.imshow("combined_image", combined_image)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self.stop_event.set()
+                break
+
     def run_mulitplane(self):
 
         self.stop_event = threading.Event()
 
         headtracker_thread = threading.Thread(target=self.headtracker_worker)
 
-        renderer_thread = threading.Thread(target=self.renderer_worker)
+        #renderer_thread = threading.Thread(target=self.renderer_worker)
 
-        compositor_thread = threading.Thread(target=self.compositor_worker)
+        #compositor_thread = threading.Thread(target=self.compositor_worker)
+
+        renderer_2D_thread = threading.Thread(target=self.renderer_2D_worker)
 
         headtracker_thread.start()
-        renderer_thread.start()
-        compositor_thread.start()
+        #renderer_thread.start()
+        #compositor_thread.start()
+
+        renderer_2D_thread.start()
 
         try:
             while not self.stop_event.is_set():
@@ -105,8 +139,9 @@ class Multiplane:
             self.stop_event.set()
 
         headtracker_thread.join()
-        renderer_thread.join()
-        compositor_thread.join()
+        #renderer_thread.join()
+        #compositor_thread.join()
+        renderer_2D_thread.join()
         time.sleep(0.1)
         os._exit(0)
 

@@ -10,6 +10,8 @@ import numpy as np
 import trimesh
 import time
 
+import create_2D_planes
+
 def create_mask_luts():
     """ Function to create 1D look up table to convert normalized depth buffer into multiplane mask"""
     indicies = np.arange(256, dtype=np.float32) 
@@ -23,15 +25,6 @@ def create_mask_luts():
     linear_background_lut = ((background_lut / 255) ** (1/2.2) * 255).astype(np.uint8)
 
     return [linear_foreground_lut, linear_middleground_lut, linear_background_lut]
-
-import matplotlib.pyplot as plt
-
-def show_lut(lut):
-    for i, color in enumerate("bgr"):
-        plt.plot(lut[:, 0, i], color)
-    plt.show(block=False)
-    plt.waitforbuttonpress()
-    plt.close()
     
 
 def create_gain_luts(gains):
@@ -67,10 +60,14 @@ def create_mask(depth, head_position, display_distance, lut):
     
     mask = mask.astype(np.uint8)
     mask = cv2.LUT(mask, lut) # apply mask
+    #erosion_kernel = np.ones((3, 3), np.uint8)
+    #mask = cv2.erode(mask, erosion_kernel, iterations=1) # apply erosion to filter aliasing artifacts
+
+    mask = cv2.blur(mask, (15, 1)) # blur depth buffer to reduce aliasing artifacts
         
     return cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) # make 3 channel
 
-def warp_image(frame, display_points, camera_position, camera_matrix):
+def warp_image(frame, display_points, camera_position, camera_matrix, pixel_offset):
     """Function to warp image by display corners"""
     
     camera_points = display_points + camera_position # find relative display points
@@ -82,10 +79,10 @@ def warp_image(frame, display_points, camera_position, camera_matrix):
     projected_points = (projected_points[:, :2] / projected_points[:, 2:3]).astype(np.float32) # normalize to camera space
 
     source_points = np.float32([ # initiialize 2D points (image corners)
-        [0, 0],             
-        [frame.shape[1], 0], 
-        [0, frame.shape[0]],
-        [frame.shape[1], frame.shape[0]]
+        [0, -pixel_offset],             
+        [frame.shape[1], -pixel_offset], 
+        [0, frame.shape[0] - pixel_offset],
+        [frame.shape[1], frame.shape[0] - pixel_offset]
     ])
 
     transform_matrix = cv2.getPerspectiveTransform(projected_points, source_points) # create transformation matrix
@@ -96,7 +93,7 @@ def warp_image(frame, display_points, camera_position, camera_matrix):
 
 class MultiplaneRenderer:
     def __init__(self):
-        self.display_scaler = 0.5
+        self.display_scaler = 1.0
         self.display_offset = int(round(5 * self.display_scaler)) # pixels
 
         self.display_resolution_x = int(800 * self.display_scaler)
@@ -107,10 +104,11 @@ class MultiplaneRenderer:
         self.display_distances = [0.0, 0.0724, 0.1448]
 
         factor = 6.0
-        gains = [(factor * 1.2, factor * 1.0, factor * 0.7), (factor * 0.5, factor * 0.5, factor * 0.5), (factor * 1.5, factor * 1.2, factor * 0.9)]
-        #gains = [(factor * 0, factor * 0, factor * 0), (factor * 1, factor * 1, factor * 1), (factor * 1, factor * 1, factor * 1.0)]
+        gains_3D = [(factor * 1.2, factor * 1.0, factor * 0.7), (factor * 0.5, factor * 0.5, factor * 0.5), (factor * 1.5, factor * 1.2, factor * 0.9)]
+        self.gain_luts_3D = create_gain_luts(gains_3D)
 
-        self.gain_luts = create_gain_luts(gains)
+        gains_2D = [(0.7, 1.0, 1.2), (0.5, 0.5, 0.5), (0.9, 1.2, 1.5)]
+        self.gain_luts_2D = create_gain_luts(gains_2D)
 
         self.mask_luts = create_mask_luts()
 
@@ -139,7 +137,9 @@ class MultiplaneRenderer:
 
     def setup_scene(self):
         """ Setup 3D scene with model and camera"""
-        model = trimesh.load('./3Dmodels/dino/model.obj') # use trimesh to import geometry
+        model = trimesh.load('./3Dmodels/enterprise/model.obj') # use trimesh to import geometry
+        #T = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0])
+        #model.apply_transform(T)
 
         translation_vector = -model.bounding_box.center_mass # move model to center based on verticies
         model.apply_translation(translation_vector)
@@ -150,7 +150,6 @@ class MultiplaneRenderer:
         model.apply_translation((0, 0, -0.0728)) # offset to middle display
 
         mesh = pyrender.Mesh.from_trimesh(model) # intialize in pyrender
-        #mesh = pyrender.Mesh.from_trimesh(model, material=pyrender.MetallicRoughnessMaterial())
 
         self.scene = pyrender.Scene(bg_color=[0.0, 0.0, 0.0, 1.0]) # intialize scene
         self.scene.add(mesh)
@@ -167,6 +166,10 @@ class MultiplaneRenderer:
         self.camera_node = self.scene.add(camera)
 
         self.renderer = pyrender.OffscreenRenderer(self.display_resolution_x, self.display_resolution_y) # intialize renderer
+
+        #self.background_image = cv2.imread('./3Dmodels/test_image/background.jpg')
+        #self.background_image = cv2.cvtColor(self.background_image, cv2.COLOR_BGR2RGB)
+        #self.background_image = (self.background_image * 0.35).astype(np.uint8)
 
     def render_scene(self, head_position):
         """function to render scene based on head position"""
@@ -198,42 +201,91 @@ class MultiplaneRenderer:
         render_start_time = time.time()
         color, depth = self.renderer.render(self.scene, flags=pyrender.RenderFlags.FLAT) # render scene and depth buffer
 
+        #alpha = cv2.cvtColor(np.where(depth == 0, 1, 0).astype(np.uint8), cv2.COLOR_GRAY2RGB)
+
+        #background = cv2.multiply(self.background_image, alpha)
+        #color = color[:, :, :3] + background
+
         end_time = time.time()
-        #print("rendering time took", end_time - start_time)
+        print("rendering time took", end_time - start_time)
 
         return color, depth, head_position, camera_matrix
 
     def composite_frames(self, color, depth, head_position, camera_matrix):
         """Function to convert rendered image into multiplane output"""
         start_time = time.time()
-        erosion_kernel = np.ones((3, 3), np.uint8) # intiialize erosion kernel to filter aliasing artifacts
+         # intiialize erosion kernel to filter aliasing artifacts
         frames = []
-        for i, (display_points, display_distance, mask_lut, gain_lut) in enumerate(zip(self.displays, self.display_distances, self.mask_luts, self.gain_luts)):
-            #show_lut(gain_lut)
+        for i, (display_points, display_distance, mask_lut, gain_lut) in enumerate(zip(self.displays, self.display_distances, self.mask_luts, self.gain_luts_3D)):
             masked_color = cv2.LUT(color, gain_lut) # apply gain lut
             mask = create_mask(depth, head_position, display_distance, mask_lut) # create mask
             masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) # apply mask
 
-            blurred_masked_color = cv2.blur(masked_color, (21,1))
+            #blurred_masked_color = cv2.blur(masked_color, (21,1))
 
-            masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) + cv2.multiply(blurred_masked_color, (255 - mask), scale=1.0/255.0)
+            #masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) + cv2.multiply(blurred_masked_color, (255 - mask), scale=1.0/255.0)
 
-            if i == 0: # skip warping for first frame, corners are already at image corners
-                projected_frame = masked_color
-
-            else:
-                masked_color = cv2.erode(masked_color, erosion_kernel, iterations=1) # apply erosion to filter aliasing artifacts
-                projected_frame = warp_image(masked_color, display_points, head_position, camera_matrix) # warp image
+            #masked_color = cv2.erode(masked_color, erosion_kernel, iterations=1) # apply erosion to filter aliasing artifacts
+            projected_frame = warp_image(masked_color, display_points, head_position, camera_matrix, self.display_offset) # warp image
 
             frames.append(projected_frame)
 
-        offset_array = np.zeros((self.display_offset + 2, self.display_resolution_x, 3), dtype=np.uint8).astype(np.uint8)
 
-        stacked_frames = np.vstack((frames[0], frames[1], frames[2], offset_array)) # stack frames
-
-        stacked_frames = stacked_frames[self.display_offset:]
+        stacked_frames = np.vstack((frames[0], frames[1], frames[2])) # stack frames
 
         end_time = time.time()
-        #print("compositing time took", end_time - start_time)
+        print("compositing time took", end_time - start_time)
 
         return stacked_frames
+
+    def setup_2D_images(self):
+        image, depth = create_2D_planes.estimate(
+            "images/horseshoe.jpg", 
+            self.display_resolution_x, 
+            self.display_resolution_y, 
+            #depth_scale=self.display_height * 3
+        )
+
+        frames = create_2D_planes.prepare_images(image, depth, self.gain_luts_2D)
+
+        # frames = []
+        
+        # for i, (display_distance, mask_lut, gain_lut) in enumerate(zip(self.display_distances, self.mask_luts, self.gain_luts_2D)):
+        #     masked_color = cv2.LUT(image, gain_lut) # apply gain lut
+        #     mask = create_mask(depth, (0,0,0), display_distance, mask_lut) # create mask
+            
+        #     masked_color = cv2.multiply(masked_color, mask, scale=1.0/255.0) # apply mask
+
+        #     frames.append(masked_color)
+
+        return frames
+
+    def composite_2D_frames(self, frames, head_position):
+            """Function to convert rendered image into multiplane output"""
+            start_time = time.time()
+
+            projected_frames = []
+
+            fx= (head_position[2]) / self.meters_to_pixels # set focal lenght to normalized head distance
+            cx= (self.display_resolution_x) / 2 + head_position[0] / self.meters_to_pixels # set lens offsets to normalized head offsets
+            cy= (self.display_resolution_y) / 2 - head_position[1] / self.meters_to_pixels
+
+            camera_matrix = np.array([ # create camera matrix
+                [fx, 0, cx],
+                [0, fx, cy],
+                [0, 0, 1]
+            ])
+
+            for i, (frame, display_points) in enumerate(zip(frames, self.displays)):
+                offset_display_points = display_points - (0,0, self.display_distances[1] / 2)
+    
+                projected_frame = warp_image(frame, offset_display_points, head_position, camera_matrix, self.display_offset) # warp image
+    
+                projected_frames.append(projected_frame)
+    
+            stacked_frames = np.vstack((projected_frames[0], projected_frames[1], projected_frames[2])) # stack frames
+    
+            end_time = time.time()
+            #print("compositing time took", end_time - start_time)
+    
+            return stacked_frames

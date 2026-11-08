@@ -105,8 +105,8 @@ def crop_image(image, target_width, target_height):
 def create_background(image, depth, display_height):
     resized_depth = cv2.resize(depth, (image.shape[1], image.shape[0]))
     
-    threshold = (1 + display_height * 2.5)
-    max = 1 + display_height * 4.0
+    threshold = (1 + display_height * 2)
+    max = 1 + display_height * 3.0
 
     mask = np.where(resized_depth < threshold, max, 0.0).astype(np.uint8)
 
@@ -114,7 +114,7 @@ def create_background(image, depth, display_height):
     mask = cv2.dilate(mask, kernel)
 
     inpainted = cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA)
-    inpainted = cv2.GaussianBlur(inpainted, (21, 21), 0)
+    #inpainted = cv2.GaussianBlur(inpainted, (21, 21), 0)
 
     cropped_inpainted = crop_image(inpainted, 800, 426)
 
@@ -126,7 +126,7 @@ def convert_image(image_path, display_width, display_height, projection_distance
     image_width = image.shape[1]
     image_height = image.shape[0]
 
-    depth = infer_depth(image, depth_scale=display_height * 4)
+    depth = infer_depth(image, depth_scale=display_height * 3)
 
     depth = depth + projection_distance
 
@@ -139,10 +139,10 @@ def convert_image(image_path, display_width, display_height, projection_distance
     cy = 518 / 2
 
     mesh = create_mesh(image, depth, fx, fy, cx, cy)
-    mesh.apply_translation((0, 0, -projection_distance - (display_height / 2)))
-    mesh.export("3Dmodels/converted.obj")
+    mesh.apply_translation((0, 0, -projection_distance - display_height))
+    mesh.export("3Dmodels/test_image/model.obj")
 
-    cv2.imwrite("3Dmodels/background.jpg", background)
+    cv2.imwrite("3Dmodels/test_image/background.jpg", background)
 
 def main():
     display_width = 0.13596

@@ -12,6 +12,13 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
+import glob
+
+def set_backlight(value):
+    for path in glob.glob("/sys/class/backlight/*/brightness"):
+        with open(path, "w") as f:
+            f.write(str(value))
+
 def read_colmap_file():
     with open("cameras.txt", 'r') as f:
         lines = f.readlines()
@@ -36,12 +43,34 @@ def read_colmap_file():
 
     return frame_width, frame_height, camera_matrix, dist_coeffs
 
+def read_display_calibration_file():
+    with open("display_calibration.txt", 'r') as f:
+        lines = f.readlines()
+
+    for line in lines:
+        if line.startswith("#"):
+            continue
+        parts = line.strip().split()
+        if len(parts) == 4:
+            camera_rotation_x = float(parts[1])
+            camera_rotation_y = float(parts[2])
+            camera_rotation_z = float(parts[3])
+
+            camera_rotation = Rotation.from_euler('xyz', [camera_rotation_x, camera_rotation_y, camera_rotation_z], degrees=True)
+
+    return camera_rotation
+
 def rotate_point(point, euler):
     rotation = Rotation.from_euler('xyz', euler, degrees=True)
     return rotation.apply(point)
 
 class HeadTracker:
     def __init__(self):
+        set_backlight(100)
+        self.backlight_status = "on"
+
+        self.backlight_timer = 0
+
         self.model_points = np.array([
             (0.0,    0.035, -0.03),    # nose tip   (y down, nose closer to camera)
             (-0.030, 0.0,    0.0),     # right eye
@@ -50,20 +79,21 @@ class HeadTracker:
             (0.060,  0.015,  0.125),   # left ear
         ], dtype=np.float32)
 
-        # self.model_points = [
-        #     (0.03, -0.035, 0.03,),             # Nose tip (origin)
-        #     (-0.00, 0.00, -0.0),        # Right eye
-        #     (0.060, 0.00, -0.0),         # Left eye
-        #     (-0.03, -0.015, -0.125),        # Right ear
-        #     (0.09, -0.015, -0.125),         # Left ear
-        # ]
+        self.calibration_model_points = [
+            (0.03, -0.035, 0.03,),             # Nose tip (origin)
+            (-0.00, 0.00, -0.0),        # Right eye
+            (0.060, 0.00, -0.0),         # Left eye
+            (-0.03, -0.015, -0.125),        # Right ear
+            (0.09, -0.015, -0.125),         # Left ear
+        ]
 
         self.frame_width, self.frame_height, self.camera_matrix, self.dist_coeffs = read_colmap_file()
+
+        self.rotation = read_display_calibration_file()
 
         self.confidence_threshold = 0.75
         self.default_head_position = np.array([-0.03, 0, 1])
 
-        self.rotation = Rotation.from_euler('xyz', (-0,-5,0), degrees=True)
         self.camera_offset = (0, 0.05, 0.0728)
         self.start = time.monotonic() * 1000
 
@@ -103,7 +133,7 @@ class HeadTracker:
 
         return mean_error
 
-    def acquire_head_position(self):
+    def acquire_head_position(self, calibration_mode=False):
 
         frame = self.camera.capture_array()
 
@@ -161,7 +191,12 @@ class HeadTracker:
                 valid_model_points = []
                 valid_image_points = []
 
-                for model_point, keypoint in zip(self.model_points, keypoints):
+                if calibration_mode:
+                    model_points = self.calibration_model_points
+                else:
+                    model_points = self.model_points
+
+                for model_point, keypoint in zip(model_points, keypoints):
                     if keypoint is not None:
                         valid_model_points.append(model_point)
                         valid_image_points.append(keypoint[:2])
@@ -190,12 +225,24 @@ class HeadTracker:
                     if success:
                         mean_error = self.find_reprojection_error(valid_model_points, valid_image_points, rotation_vector, translation_vector)
                         if mean_error < 60:
-                            head_position = translation_vector.flatten() * (-1, -1, 1) + self.camera_offset
+                            head_position = translation_vector.flatten() * (-1, -1, 1)
+                            
+                            if not calibration_mode:
+                                head_position = self.rotation.apply(head_position) + self.camera_offset
+
+                            self.backlight_timer = time.time()
+                            if self.backlight_status == "off":
+                                set_backlight(100)
+                                self.backlight_status = "on"
+
                         #print("head position", head_position)
                         
 
             except Exception as e:
                 print("Error:", e)
 
+        if time.time() - self.backlight_timer > 5:
+            set_backlight(0)
+            self.backlight_status = "off"
         return head_position
 
