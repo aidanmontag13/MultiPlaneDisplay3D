@@ -10,9 +10,10 @@ import subprocess
 import random
 import glob
 import numpy as np
+import getpass
 
 def find_usb_files():
-    user = "multiplane"
+    user = getpass.getuser()
     media_root = f"/media/{user}"
 
     image_paths = []
@@ -28,7 +29,7 @@ def find_usb_files():
             print(f"Found images folder on USB: {images_folder}")
 
             # Add all image files (jpg, png, tiff)
-            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff"):
+            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", ".heic", ".heif", ".webp"):
                 image_paths.extend(glob.glob(os.path.join(images_folder, ext)))
         else:
             print(f"No images folder found on USB: {drive_path}")
@@ -83,7 +84,7 @@ class Multiplane:
             start_time = time.time()
             head_position = self.headtracker.acquire_head_position()
             end_time = time.time()
-            print("headtracking took", end_time - start_time, "seconds")
+            #print("headtracking took", end_time - start_time, "seconds")
 
             if head_position is not None:
                 if self.idle_mode == True:
@@ -143,7 +144,6 @@ class Multiplane:
             camera_matrix = renders[3]
 
             combined_image = self.multiplane_renderer.composite_frames(color, depth, camera_pose, camera_matrix)
-            combined_image = cv2.cvtColor(combined_image, cv2.COLOR_RGB2BGR)
             
             if self.composite_queue.full():
                 try:
@@ -224,6 +224,8 @@ class Multiplane:
             if render_time > self.render_duration - fade_time: # always fade out for 2D and 3D
                 alpha = np.clip(((self.render_duration - render_time) / fade_time), 0.0, 1.0)
                 stacked_image = (stacked_image * alpha).astype(np.uint8)
+
+            stacked_image = cv2.cvtColor(stacked_image, cv2.COLOR_RGB2BGR)
             
             cv2.imshow("combined_image", stacked_image)
 
@@ -268,7 +270,7 @@ class Multiplane:
 
             self.file_start_time = time.time()
 
-            if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff")):
+            if file_path.lower().endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff", ".heic", ".heif", ".webp")):
                 renderer_thread = threading.Thread(target=self.renderer_2D_worker, args=(file_path,))
                 renderer_thread.start()
                 compositor_thread = None
@@ -309,11 +311,18 @@ class Multiplane:
 def main():
     subprocess.Popen(["unclutter", "-idle", "0", "-root"])
     try:
-        headtracker.read_colmap_file()
-    except(FileNotFoundError):
+        headtracker.read_camera_intrinsic_file()
+    except(FileNotFoundError, UnboundLocalError):
         print("no camera calibration file found, beginning calibration")
         print()
-        subprocess.run(["python", "calibrate.py"])
+        subprocess.run(["python", "calibrate_camera_intrinsics.py"])
+
+    try:
+        headtracker.read_camera_offset_file()
+    except(FileNotFoundError, UnboundLocalError):
+        print("no camera calibration file found, beginning calibration")
+        print()
+        subprocess.run(["python", "calibrate_camera_offset.py"])
 
     cave = Multiplane()
     cave.run_mulitplane()

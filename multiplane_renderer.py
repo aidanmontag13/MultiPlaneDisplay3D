@@ -34,10 +34,8 @@ def create_gain_luts(gains):
     values = np.arange(256, dtype=np.float32)
 
     for gain in gains:
-        print("gain", gain)
         lut = np.empty((256, 1, 3), dtype=np.uint8)
         for channel, channel_value in enumerate(gain):
-            print("channel value", channel_value)
             lut[:, 0, channel] = np.clip((values / 255.0) * (channel_value ** (1 / 2.2)) * 255.0, 0, 255)
 
         gain_luts.append(lut)
@@ -107,7 +105,7 @@ class MultiplaneRenderer:
         gains_3D = [(factor * 1.2, factor * 1.0, factor * 0.7), (factor * 0.5, factor * 0.5, factor * 0.5), (factor * 1.5, factor * 1.2, factor * 0.9)]
         self.gain_luts_3D = create_gain_luts(gains_3D)
 
-        gains_2D = [(0.7, 1.0, 1.2), (0.5, 0.5, 0.5), (0.9, 1.2, 1.5)]
+        gains_2D = [(1.2, 1.0, 0.7), (0.5, 0.5, 0.5), (1.5, 1.2, 0.9)]
         self.gain_luts_2D = create_gain_luts(gains_2D)
 
         self.mask_luts = create_mask_luts()
@@ -214,7 +212,7 @@ class MultiplaneRenderer:
         #color = color[:, :, :3] + background
 
         end_time = time.time()
-        print("rendering time took", end_time - start_time)
+        #print("rendering time took", end_time - start_time)
 
         return color, depth, head_position, camera_matrix
 
@@ -241,7 +239,7 @@ class MultiplaneRenderer:
         stacked_frames = np.vstack((frames[0], frames[1], frames[2])) # stack frames
 
         end_time = time.time()
-        print("compositing time took", end_time - start_time)
+        #print("compositing time took", end_time - start_time)
 
         return stacked_frames
 

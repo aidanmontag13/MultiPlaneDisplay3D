@@ -13,9 +13,19 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 import glob
+import getpass
 
-def read_colmap_file():
-    with open("cameras.txt", 'r') as f:
+def read_camera_intrinsic_file():
+
+    user = getpass.getuser()
+    media_root = f"/media/{user}"
+
+    # Loop over all USB drives
+    for drive in os.listdir(media_root):
+        drive_path = os.path.join(media_root, drive)
+        calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
+        
+    with open(calibration_file, 'r') as f:
         lines = f.readlines()
 
     camera_matrix = None
@@ -38,8 +48,16 @@ def read_colmap_file():
 
     return frame_width, frame_height, camera_matrix, dist_coeffs
 
-def read_display_calibration_file():
-    with open("display_calibration.txt", 'r') as f:
+def read_camera_offset_file():
+    user = getpass.getuser()
+    media_root = f"/media/{user}"
+
+    # Loop over all USB drives
+    for drive in os.listdir(media_root):
+        drive_path = os.path.join(media_root, drive)
+        calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
+        
+    with open(calibration_file, 'r') as f:
         lines = f.readlines()
 
     for line in lines:
@@ -78,9 +96,14 @@ class HeadTracker:
             (0.09, -0.015, -0.125),         # Left ear
         ]
 
-        self.frame_width, self.frame_height, self.camera_matrix, self.dist_coeffs = read_colmap_file()
+        self.frame_width, self.frame_height, self.camera_matrix, self.dist_coeffs = read_camera_intrinsic_file()
 
-        self.rotation = read_display_calibration_file()
+        try:
+            self.rotation = read_camera_offset_file()
+
+        except(FileNotFoundError):
+            self.rotation = None
+
 
         self.confidence_threshold = 0.75
         self.default_head_position = np.array([-0.03, 0, 1])
@@ -142,7 +165,7 @@ class HeadTracker:
         detection_start = time.time()
         results = self.detector.detect_for_video(mp_frame, timestamp)
         detection_end = time.time()
-        print("detection time took", detection_end - detection_start)
+        #print("detection time took", detection_end - detection_start)
         head_position = None
 
         if len(results.detections) > 0:

@@ -2,8 +2,34 @@ import cv2
 import time
 import numpy as np
 import threading
+import getpass
+import os
 
 from picamera2 import Picamera2
+
+def write_colmap_file(latest_frame, camera_matrix, dist_coeffs):
+        
+        user = getpass.getuser()
+        media_root = f"/media/{user}"
+
+        # Loop over all USB drives
+        for drive in os.listdir(media_root):
+            drive_path = os.path.join(media_root, drive)
+            calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
+
+        fx = camera_matrix[0, 0]
+        fy = camera_matrix[1, 1]
+        cx = camera_matrix[0, 2]
+        cy = camera_matrix[1, 2]
+
+        k1, k2, p1, p2 = dist_coeffs.ravel()[:4]
+        
+        with open(calibration_file, 'w') as f:
+            f.write("# Camera list with one line of data per camera:\n")
+            f.write("# CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
+            f.write("# Number of cameras: 1\n")
+
+            f.write(f"0 OPENCV {latest_frame.shape[1]} {latest_frame.shape[0]} {fx} {fy} {cx} {cy} {k1} {k2} {p1} {p2}\n")
 
 class CameraCalibrator:
     def __init__(self, checkerboard_length=5, checkerboard_width=8):
@@ -124,9 +150,8 @@ class CameraCalibrator:
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 self.stop_event.set()
-                break
+                breaks
 
-        self.cap.release()
         cv2.destroyAllWindows()
 
     def checkerboard_extraction_worker(self):
@@ -159,22 +184,6 @@ class CameraCalibrator:
             print("Enough checkerboard corners have been detected across the frame)")
             self.stop_event.set()
 
-    def write_colmap_file(self, filename, camera_matrix, dist_coeffs):
-
-        fx = camera_matrix[0, 0]
-        fy = camera_matrix[1, 1]
-        cx = camera_matrix[0, 2]
-        cy = camera_matrix[1, 2]
-
-        k1, k2, p1, p2 = dist_coeffs.ravel()[:4]
-        
-        with open(filename, 'w') as f:
-            f.write("# Camera list with one line of data per camera:\n")
-            f.write("# CAMERA_ID, MODEL, WIDTH, HEIGHT, PARAMS[]\n")
-            f.write("# Number of cameras: 1\n")
-
-            f.write(f"0 OPENCV {self.latest_frame.shape[1]} {self.latest_frame.shape[0]} {fx} {fy} {cx} {cy} {k1} {k2} {p1} {p2}\n")
-
 
     def calibrate_camera(self):
         self.stop_event = threading.Event()
@@ -201,7 +210,7 @@ class CameraCalibrator:
                         None
                     )
             
-            self.write_colmap_file("cameras.txt", camera_matrix, dist_coeffs)
+            write_colmap_file(self.latest_frame, camera_matrix, dist_coeffs)
             print("Camera calibration successful.")
             print("Camera Matrix:\n", camera_matrix)
             print("Distortion Coefficients:\n", dist_coeffs)

@@ -1,5 +1,6 @@
 import onnxruntime
 import cv2
+import OpenImageIO as iio
 import numpy as np
 from PIL import Image
 from skimage.filters import threshold_multiotsu
@@ -12,19 +13,18 @@ onnx_session = onnxruntime.InferenceSession(
 input_name = onnx_session.get_inputs()[0].name
 
 def preprocess_color(image):
-    img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    img = cv2.resize(img, (518, 518))
-    img = img.astype(np.float32) / 255.0
+    preprocessed_image = cv2.resize(image, (518, 518))
+    preprocessed_image = preprocessed_image.astype(np.float32) / 255.0
 
     # model normalization
     mean = np.array([0.5, 0.5, 0.5], dtype=np.float32)
     std  = np.array([0.5, 0.5, 0.5], dtype=np.float32)
-    img = (img - mean) / std
+    preprocessed_image = (preprocessed_image - mean) / std
 
-    img = img.transpose(2, 0, 1)  # HWC → CHW
-    img = img[None, ...]          # add batch dim
+    preprocessed_image = preprocessed_image.transpose(2, 0, 1)  # HWC → CHW
+    preprocessed_image = preprocessed_image[None, ...]          # add batch dim
     
-    return img
+    return preprocessed_image
 
 def infer_depth(image, depth_scale=1.0):
 
@@ -90,7 +90,8 @@ def create_mask(depth, low_thresh, high_thresh, rolloff_a, rolloff_b):
     return mask
 
 def estimate(image_path, display_width, display_height, depth_scale=1.0):
-    image = cv2.imread(image_path)
+    image_input = iio.ImageInput.open(image_path)
+    image = image_input.read_image(iio.UINT8)
 
     image = crop_image(image, display_width, display_height)
 
@@ -116,8 +117,6 @@ def prepare_images(image, depth, gain_luts_2D):
     background_mask = create_mask(depth, ot2, 1.0, rolloff_b, 0.0)
     background = (image * background_mask).astype(np.uint8)
     background = cv2.LUT(background, gain_luts_2D[2])
-
-    print("mean", np.min(foreground_mask + middleground_mask + background_mask))
 
     images = [foreground, middleground, background]
 
