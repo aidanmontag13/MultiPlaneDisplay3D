@@ -46,6 +46,11 @@ def find_usb_files():
 
     return image_paths, model_paths
 
+def set_backlight(value):
+    for path in glob.glob("/sys/class/backlight/*/brightness"):
+        with open(path, "w") as f:
+            f.write(str(value))
+
 class Multiplane:
     def __init__(self):
         self.multiplane_renderer = MultiplaneRenderer()
@@ -64,18 +69,34 @@ class Multiplane:
 
         self.flat_frame = None
 
+        self.idle_mode = False
+
     def headtracker_worker(self):
 
+        idle_time = time.time()
+
         while not self.quit_event.is_set():
+
+            if self.idle_mode == True:
+                time.sleep(1.0)
+    
             start_time = time.time()
             head_position = self.headtracker.acquire_head_position()
             end_time = time.time()
             print("headtracking took", end_time - start_time, "seconds")
 
             if head_position is not None:
-                with self.position_lock:
+                if self.idle_mode == True:
+                    self.idle_mode = False
+                    set_backlight(100)
 
+                with self.position_lock:
                     self.head_position = head_position
+                    idle_time = time.time()
+        
+            if time.time() - idle_time > 5 and self.idle_mode is False:
+                set_backlight(0)
+                self.idle_mode = True
 
     def renderer_worker(self, file_path):
 
@@ -84,6 +105,10 @@ class Multiplane:
         self.multiplane_renderer.setup_scene(file_path)
 
         while not self.renderer_stop_event.is_set():
+            if self.idle_mode == True:
+                time.sleep(0.1)
+                continue
+
             if self.head_position is not None:
                 head_position = self.head_position   
 
@@ -103,6 +128,10 @@ class Multiplane:
         self.flat_frame = None
     
         while not self.renderer_stop_event.is_set():
+            if self.idle_mode == True:
+                time.sleep(0.1)
+                continue
+
             try:
                 renders = self.render_queue.get(timeout=0.02)
             except queue.Empty:
@@ -130,6 +159,11 @@ class Multiplane:
         frames, self.flat_frame = self.multiplane_renderer.setup_2D_images(image_path)
 
         while not self.renderer_stop_event.is_set():
+
+            if self.idle_mode == True:
+                time.sleep(0.1)
+                continue
+
             if self.head_position is not None:
                 head_position = self.head_position   
 
@@ -157,11 +191,16 @@ class Multiplane:
         timeout_frames = 0
     
         while not self.quit_event.is_set():
+
+            if self.idle_mode == True:
+                time.sleep(0.1)
+                continue
             
+            start_offset = 3.0
             render_time = time.time() - self.file_start_time
             fade_time = 2.0
 
-            flat_time = 5.0
+            flat_time = 3.0
             fadein_time = fade_time + flat_time
 
             try:
@@ -170,15 +209,20 @@ class Multiplane:
                 continue
 
             if self.flat_frame is not None: # for 2D images, have flat to 2.5D transition
-                if render_time < fadein_time:
-                    alpha = flat_time * (fadein_time - render_time) / fadein_time
+
+                if (render_time - start_offset) < fade_time:
+                    alpha = np.clip((render_time - start_offset) / fade_time, 0.0, 1.0)
+                    stacked_image = (self.flat_frame * alpha).astype(np.uint8)
+
+                if (render_time - start_offset) < fadein_time and render_time - start_offset > fade_time:
+                    alpha = flat_time * (fadein_time - (render_time - start_offset)) / fadein_time
                     alpha = np.clip((alpha), 0.0, 1.0)
 
                     stacked_image = cv2.addWeighted(stacked_image, (1.0-alpha), self.flat_frame, alpha, 0.0)
 
 
             if render_time > self.render_duration - fade_time: # always fade out for 2D and 3D
-                alpha = np.clip(((self.render_duration - render_time) / fade_time), 0.0, None)
+                alpha = np.clip(((self.render_duration - render_time) / fade_time), 0.0, 1.0)
                 stacked_image = (stacked_image * alpha).astype(np.uint8)
             
             cv2.imshow("combined_image", stacked_image)
@@ -188,6 +232,10 @@ class Multiplane:
                 break
 
     def run_mulitplane(self):
+
+        set_backlight(100)
+
+        last_file = None
 
         image_paths, model_paths = find_usb_files()
 
@@ -206,7 +254,14 @@ class Multiplane:
 
         while time.time() - multiplane_start_time < 3600 and not self.quit_event.is_set(): # run for 1 hour
             self.renderer_stop_event.clear()   
+
             random_file = random.randint(0, len(file_paths) - 1)
+
+            if random_file == last_file: # prevent the same file twice in a row
+                continue
+
+            else:
+                last_file = random_file
 
             file_path = file_paths[random_file]
             print("displaying file:", file_path)
@@ -227,14 +282,11 @@ class Multiplane:
 
             try:
                 while not self.renderer_stop_event.is_set() and time.time() - self.file_start_time < self.render_duration: # run each image for 30 seconds
-                    print("time elapsed for current image:", time.time() - self.file_start_time)
                     time.sleep(0.1)
 
             except KeyboardInterrupt:
                 self.quit_event.set()
                 self.renderer_stop_event.set()
-
-            print("going to next file")
 
             self.renderer_stop_event.set()
 
@@ -245,10 +297,12 @@ class Multiplane:
 
             time.sleep(0.1)
         
+        self.renderer_stop_event.set()
+        self.quit_event.set()
+
         headtracker_thread.join()
         display_thread.join()
         cv2.destroyAllWindows()
-        self.quit_event.set()
         time.sleep(0.1)
         os._exit(0)
 

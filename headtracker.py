@@ -14,11 +14,6 @@ from mediapipe.tasks.python import vision
 
 import glob
 
-def set_backlight(value):
-    for path in glob.glob("/sys/class/backlight/*/brightness"):
-        with open(path, "w") as f:
-            f.write(str(value))
-
 def read_colmap_file():
     with open("cameras.txt", 'r') as f:
         lines = f.readlines()
@@ -66,10 +61,6 @@ def rotate_point(point, euler):
 
 class HeadTracker:
     def __init__(self):
-        set_backlight(100)
-        self.backlight_status = "on"
-
-        self.backlight_timer = 0
 
         self.model_points = np.array([
             (0.0,    0.035, -0.03),    # nose tip   (y down, nose closer to camera)
@@ -112,9 +103,9 @@ class HeadTracker:
 
         self.camera = Picamera2()
         config = self.camera.create_preview_configuration(
-            main={"size": (640, 480), "format": "BGR888"},      # see #3 for why BGR888
-            sensor={"output_size": (1640, 1232), "bit_depth": 10},  # force same FOV as calibration
-            transform=Transform(hflip=1, vflip=1),              # see #2
+            main={"size": (640, 480), "format": "BGR888"},
+            sensor={"output_size": (1640, 1232), "bit_depth": 10},
+            transform=Transform(hflip=1, vflip=1),
             buffer_count=4,
         )
         self.camera.configure(config)
@@ -151,7 +142,7 @@ class HeadTracker:
         detection_start = time.time()
         results = self.detector.detect_for_video(mp_frame, timestamp)
         detection_end = time.time()
-        #print("detection time took", detection_end - detection_start)
+        print("detection time took", detection_end - detection_start)
         head_position = None
 
         if len(results.detections) > 0:
@@ -229,20 +220,10 @@ class HeadTracker:
                             
                             if not calibration_mode:
                                 head_position = self.rotation.apply(head_position) + self.camera_offset
-
-                            self.backlight_timer = time.time()
-                            if self.backlight_status == "off":
-                                set_backlight(100)
-                                self.backlight_status = "on"
-
-                        #print("head position", head_position)
                         
 
             except Exception as e:
                 print("Error:", e)
 
-        if time.time() - self.backlight_timer > 5:
-            set_backlight(0)
-            self.backlight_status = "off"
         return head_position
 

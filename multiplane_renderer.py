@@ -286,7 +286,7 @@ class MultiplaneRenderer:
             ])
 
             for i, (frame, display_points) in enumerate(zip(frames, self.displays)):
-                offset_display_points = display_points# - (0,0, self.display_distances[1] / 2)
+                offset_display_points = display_points - (0,0, self.display_distances[1] / 2)
     
                 projected_frame = warp_image(frame, offset_display_points, head_position, camera_matrix, self.display_offset) # warp image
     
@@ -295,6 +295,5 @@ class MultiplaneRenderer:
             stacked_frames = np.vstack((projected_frames[0], projected_frames[1], projected_frames[2])) # stack frames
     
             end_time = time.time()
-            #print("compositing time took", end_time - start_time)
     
             return stacked_frames

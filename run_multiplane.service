@@ -8,7 +8,7 @@ Type=simple
 
 User=multiplane
 Group=multiplane
-WorkingDirectory=/home/multiplane/MultiPlaneDisplay
+WorkingDirectory=/home/multiplane/MultiPlaneDisplay3D
 
 Environment=DISPLAY=:0
 Environment=XAUTHORITY=/home/multiplane/.Xauthority
@@ -18,7 +18,7 @@ TimeoutStopSec=10
 KillSignal=SIGTERM
 KillMode=control-group
 
-ExecStart=/home/multiplane/MultiPlaneDisplay/.venv/bin/python \
+ExecStart=/home/multiplane/MultiPlaneDisplay3D/.venv/bin/python \
           /home/multiplane/MultiPlaneDisplay3D/run_multiplane.py
 
 Restart=always
