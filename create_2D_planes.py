@@ -50,6 +50,21 @@ def crop_image(image, target_width, target_height):
     target_aspect_ratio = target_width / target_height
     original_aspect_ratio = image_width / image_height
 
+    if original_aspect_ratio <= 1:
+        buffer = int((image_height - image_width) / 2)
+
+        image = cv2.copyMakeBorder(
+            image,
+            top=0,
+            bottom=0,
+            left=buffer,
+            right=buffer,
+            borderType=cv2.BORDER_CONSTANT,
+            value=(0, 0, 0)
+        )
+
+        image_width = image.shape[1]
+
     if target_aspect_ratio <= original_aspect_ratio:
         new_width = int(image_height * target_aspect_ratio)
         start_x = int((image_width - new_width) / 2.0)
