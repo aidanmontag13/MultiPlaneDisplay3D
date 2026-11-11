@@ -89,7 +89,7 @@ Before usage, the camera intrinsics and display offset must be calibrated to dis
 For intrinsic calibration, you must print a 9x6 checkerboard like below. Use a clipboard or book to keep the paper flat. 
 
 <p align="center">
-  <img src="artifacts/checkerbaord.pdf" width="500">
+  <img src="artifacts/checkerboard.pdf" width="500">
 </p>
 
 
