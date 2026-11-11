@@ -42,9 +42,6 @@ Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable
   </tr>
 </table>
 
-
-
-
 ## Gallery
 <p align="center">
   <img src="artifacts/left.jpg" width="250">
@@ -76,7 +73,7 @@ Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable
 - USB Drive  https://a.co/d/dX8yHnJ
 - 250 mm CSI cable  https://a.co/d/1fIMcX2
 
-INSTALLATION
+### Installation
 
 ```
 git clone https://github.com/aidanmontag13/MultiPlaneDisplay3D.git
@@ -84,14 +81,16 @@ cd MultiPlaneDisplay3D
 bash setup.sh
 ```
 
-## Calibration
+# Calibration
 
 Before usage, the camera intrinsics and display offset must be calibrated to display properly. This is accomplished in 2 Stages.
 
-```
+## Stage 1: Intrinsic Calibration
+For intrinsic calibration, you must print a 9x6 checkerboard like below. Use a clipboard or book to keep the paper flat. 
 
-```
-
+<p align="center">
+  <img src="artifacts/checkerbaord.pdf" width="500">
+</p>
 
 
 
