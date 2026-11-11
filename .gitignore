@@ -5,7 +5,6 @@ venv/
 env/
 .venv/
 .env/
-pyrender_fixes/
 display_calibration.txt
 cameras.txt
 *.pyc
