@@ -12,6 +12,44 @@ import glob
 import numpy as np
 import getpass
 
+def downsample_object_textures():
+
+    user = getpass.getuser()
+    media_root = f"/media/{user}"
+
+    texture_paths = []
+
+    # Loop over all USB drives
+    for drive in os.listdir(media_root):
+        drive_path = os.path.join(media_root, drive)
+        models_folder = os.path.join(drive_path, "models")
+
+    if os.path.isdir(models_folder):
+        print(f"Found models folder on USB: {models_folder}")
+
+        for dirpath, dirnames, filenames in os.walk(models_folder):
+            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff"):
+                texture_paths.extend(glob.glob(os.path.join(dirpath, ext)))
+    else:
+        print(f"No models folder found on USB: {drive_path}")
+
+    print("texture paths", texture_paths)
+
+    for texture_path in texture_paths:
+        texture = cv2.imread(texture_path)
+
+        texture_width = texture.shape[1]
+        texture_height = texture.shape[0]
+
+        if texture_width > 1024 or texture_height > 1024:
+            print("downscaling", texture_path)
+
+            new_width = int(1024)
+            new_height = int(1024 * (texture_height / texture_width))
+            texture = cv2.resize(texture, (new_width, new_height), cv2.INTER_AREA)
+
+            cv2.imwrite(texture_path, texture)
+
 def find_usb_files():
     user = getpass.getuser()
     media_root = f"/media/{user}"
@@ -29,7 +67,7 @@ def find_usb_files():
             print(f"Found images folder on USB: {images_folder}")
 
             # Add all image files (jpg, png, tiff)
-            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", ".heic", ".heif", ".webp"):
+            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", "*.heic", "*.heif", "*.webp"):
                 image_paths.extend(glob.glob(os.path.join(images_folder, ext)))
         else:
             print(f"No images folder found on USB: {drive_path}")
@@ -44,6 +82,9 @@ def find_usb_files():
                     model_paths.extend(glob.glob(os.path.join(dirpath, ext)))
         else:
             print(f"No models folder found on USB: {drive_path}")
+
+    print("image paths", image_paths)
+    print("model paths", model_paths)
 
     return image_paths, model_paths
 
@@ -101,13 +142,13 @@ class Multiplane:
 
     def renderer_worker(self, file_path):
 
-        alpha = 0.15  # Smoothing factor
+        alpha = 0.2  # Smoothing factor
 
         self.multiplane_renderer.setup_scene(file_path)
 
         while not self.renderer_stop_event.is_set():
             if self.idle_mode == True:
-                time.sleep(0.1)
+                time.sleep(1.0)
                 continue
 
             if self.head_position is not None:
@@ -130,7 +171,7 @@ class Multiplane:
     
         while not self.renderer_stop_event.is_set():
             if self.idle_mode == True:
-                time.sleep(0.1)
+                time.sleep(1.0)
                 continue
 
             try:
@@ -161,7 +202,7 @@ class Multiplane:
         while not self.renderer_stop_event.is_set():
 
             if self.idle_mode == True:
-                time.sleep(0.1)
+                time.sleep(1.0)
                 continue
 
             if self.head_position is not None:
@@ -189,24 +230,36 @@ class Multiplane:
         )
 
         timeout_frames = 0
+        start_offset = 3.0
+        fade_time = 1.0
+        flat_time = 3.0
+        fadein_time = fade_time + flat_time
+
+        black_frame = np.zeros((100,100,3)).astype(np.uint8)
+        shutter = False
+
     
         while not self.quit_event.is_set():
 
             if self.idle_mode == True:
-                time.sleep(0.1)
+                if shutter == False:
+                    cv2.imshow("combined_image", black_frame)
+                    shutter = True
+
+                cv2.waitKey(1)
+                time.sleep(1.0)
                 continue
             
-            start_offset = 3.0
-            render_time = time.time() - self.file_start_time
-            fade_time = 2.0
-
-            flat_time = 3.0
-            fadein_time = fade_time + flat_time
+            else:
+                if shutter == True:
+                    shutter = False
 
             try:
                 stacked_image = self.composite_queue.get(timeout=0.02)
             except queue.Empty:
                 continue
+
+            render_time = time.time() - self.file_start_time
 
             if self.flat_frame is not None: # for 2D images, have flat to 2.5D transition
 
@@ -219,6 +272,11 @@ class Multiplane:
                     alpha = np.clip((alpha), 0.0, 1.0)
 
                     stacked_image = cv2.addWeighted(stacked_image, (1.0-alpha), self.flat_frame, alpha, 0.0)
+            
+            else:
+                if (render_time - start_offset) < fade_time:
+                    alpha = np.clip((render_time - start_offset) / fade_time, 0.0, 1.0)
+                    stacked_image = (stacked_image * alpha).astype(np.uint8)
 
 
             if render_time > self.render_duration - fade_time: # always fade out for 2D and 3D
@@ -237,12 +295,6 @@ class Multiplane:
 
         set_backlight(100)
 
-        last_file = None
-
-        image_paths, model_paths = find_usb_files()
-
-        file_paths = image_paths + model_paths
-
         multiplane_start_time = time.time()
 
         self.quit_event = threading.Event()
@@ -254,19 +306,30 @@ class Multiplane:
         display_thread = threading.Thread(target=self.display_worker)
         display_thread.start()
 
+        downsample_object_textures()
+
+        image_paths, model_paths = find_usb_files()
+        file_paths = image_paths + model_paths
+        random.shuffle(file_paths)
+        file_index = 0
+
         while time.time() - multiplane_start_time < 3600 and not self.quit_event.is_set(): # run for 1 hour
-            self.renderer_stop_event.clear()   
 
-            random_file = random.randint(0, len(file_paths) - 1)
-
-            if random_file == last_file: # prevent the same file twice in a row
+            if self.idle_mode == True:
+                time.sleep(0.1)
                 continue
 
-            else:
-                last_file = random_file
+            self.renderer_stop_event.clear()   
 
-            file_path = file_paths[random_file]
+            file_path = file_paths[file_index]
             print("displaying file:", file_path)
+
+            file_index += 1
+
+            if file_index >= len(file_paths):
+                random.shuffle(file_paths)
+                file_index = 0
+
 
             self.file_start_time = time.time()
 

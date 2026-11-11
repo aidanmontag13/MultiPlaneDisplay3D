@@ -143,14 +143,27 @@ class MultiplaneRenderer:
         self.meters_to_pixels = self.display_width / self.display_resolution_x
         
         model = trimesh.load(file_path) # use trimesh to import geometry
-        #T = trimesh.transformations.rotation_matrix(np.pi, [1, 0, 0])
-        #model.apply_transform(T)
+
+        if isinstance(model, trimesh.Scene):
+            model = trimesh.util.concatenate(
+                tuple(model.geometry.values())
+            )
 
         translation_vector = -model.bounding_box.center_mass # move model to center based on verticies
         model.apply_translation(translation_vector)
 
         model_dimensions = model.bounding_box_oriented.extents # scale model to fit within display dimensions
-        model.apply_scale((self.display_width * 1.0) / (np.max(model_dimensions[:2])))
+
+        scale_1 = (self.display_width * 1.0) / (np.max(model_dimensions[0]))
+        scale_2 = (self.display_height * 1.0) / (np.max(model_dimensions[1]))
+
+        if scale_1 >= scale_2:
+            scale = scale_2
+
+        else:
+            scale = scale_1
+
+        model.apply_scale(scale)
 
         model.apply_translation((0, 0, -0.0728)) # offset to middle display
 

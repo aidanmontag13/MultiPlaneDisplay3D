@@ -26,7 +26,7 @@ def preprocess_color(image):
     
     return preprocessed_image
 
-def infer_depth(image, depth_scale=1.0):
+def infer_depth(image):
 
     preprocessed_image = preprocess_color(image)
 
@@ -36,13 +36,12 @@ def infer_depth(image, depth_scale=1.0):
     # rescale depth for saving
     depth = (depth - depth.min()) / (depth.max() - depth.min())
     depth = (1 - depth) ** 3
-    depth = depth * depth_scale
     
     depth = cv2.resize(depth, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
 
     return depth
 
-def crop_image(image, target_width, target_height):
+def resize_image(image, depth, target_width, target_height):
 
     image_width = image.shape[1]
     image_height = image.shape[0]
@@ -50,8 +49,32 @@ def crop_image(image, target_width, target_height):
     target_aspect_ratio = target_width / target_height
     original_aspect_ratio = image_width / image_height
 
-    if original_aspect_ratio <= 1:
-        buffer = int((image_height - image_width) / 2)
+    if target_aspect_ratio <= original_aspect_ratio:
+        buffer = int(((image_width / target_aspect_ratio) - image_height) / 2)
+
+        image = cv2.copyMakeBorder(
+            image,
+            top=buffer,
+            bottom=buffer,
+            left=0,
+            right=0,
+            borderType=cv2.BORDER_CONSTANT,
+            value=(0, 0, 0)
+        )
+
+        depth = cv2.copyMakeBorder(
+            depth,
+            top=buffer,
+            bottom=buffer,
+            left=0,
+            right=0,
+            borderType=cv2.BORDER_CONSTANT,
+            value=(0)
+        )
+
+
+    else:
+        buffer = int(((image_height * target_aspect_ratio) - image_width) / 2)
 
         image = cv2.copyMakeBorder(
             image,
@@ -63,23 +86,20 @@ def crop_image(image, target_width, target_height):
             value=(0, 0, 0)
         )
 
-        image_width = image.shape[1]
+        depth = cv2.copyMakeBorder(
+            depth,
+            top=0,
+            bottom=0,
+            left=buffer,
+            right=buffer,
+            borderType=cv2.BORDER_CONSTANT,
+            value=(0)
+        )
 
-    if target_aspect_ratio <= original_aspect_ratio:
-        new_width = int(image_height * target_aspect_ratio)
-        start_x = int((image_width - new_width) / 2.0)
+    resized_image = cv2.resize(image, (target_width, target_height))
+    resized_depth = cv2.resize(depth, (target_width, target_height))
 
-        cropped_image = image[:,start_x:start_x + new_width]
-
-    else:
-        new_height = int(image_width / target_aspect_ratio)
-        start_y = int((image_height - new_height) / 2.0)
-
-        cropped_image = image[start_y:start_y+new_height,:]
-
-    resized_image = cv2.resize(cropped_image, (target_width, target_height))
-
-    return resized_image
+    return resized_image, resized_depth
 
 def create_mask(depth, low_thresh, high_thresh, rolloff_a, rolloff_b):
     mask = np.zeros_like(depth, dtype=np.float32)
@@ -104,13 +124,19 @@ def create_mask(depth, low_thresh, high_thresh, rolloff_a, rolloff_b):
 
     return mask
 
-def estimate(image_path, display_width, display_height, depth_scale=1.0):
+def estimate(image_path, display_width, display_height):
     image_input = iio.ImageInput.open(image_path)
     image = image_input.read_image(iio.UINT8)
 
-    image = crop_image(image, display_width, display_height)
+    if image.shape[2] == 1:
+        print("converting grayscale to rgb")
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
-    depth = infer_depth(image, depth_scale=depth_scale)
+    image = image[:,:,:3] # remove channels beyond rgb
+
+    depth = infer_depth(image)
+
+    image, depth = resize_image(image, depth, display_width, display_height)
 
     return image, depth
 
