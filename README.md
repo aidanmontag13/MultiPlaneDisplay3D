@@ -86,6 +86,10 @@ bash setup.sh
 # Setting up the USB drive
 For multiplane display, your images, 3d models, and calibration files are storred on a usb drive. This drive must be set up before running the system. Make sure the drive is formatted in the fat32 or ex-fat file system. Create a "images" folder and "models" folder in the drives root directory. Image files can be placed directly into the images folder. 3D models must be placed in a unique folder in the models folder containing the .obj, .mtl, and .jpg texture file.
 
+<p align="center">
+  <img src="artifacts/usbfolder.png" width="500">
+</p>
+
 Make sure to plug the usb drive into the blue usb 3.0 port on the raspberry pi.
 
 # Calibration
