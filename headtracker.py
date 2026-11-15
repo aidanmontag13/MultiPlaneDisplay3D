@@ -21,7 +21,7 @@ def read_camera_intrinsic_file():
     drive = "mplanedrive"
     drive_path = f"/media/{user}/{drive}"
    
-    calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
+    calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
         
     with open(calibration_file, 'r') as f:
         lines = f.readlines()
@@ -51,7 +51,7 @@ def read_camera_offset_file():
     drive = "mplanedrive"
     drive_path = f"/media/{user}/{drive}"
    
-    calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
+    calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
         
     with open(calibration_file, 'r') as f:
         lines = f.readlines()
