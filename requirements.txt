@@ -4,7 +4,5 @@ onnxruntime
 scikit-image
 mediapipe
 picamera2
-pyrender==0.1.45 --no-deps
-PyOpenGL==3.1.6 --no-deps
 trimesh==5.1.0
 oiio-python

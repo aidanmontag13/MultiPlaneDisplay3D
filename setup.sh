@@ -48,15 +48,19 @@ echo "System packages finished installing"
 # Set up virtual environment
 echo "Creating virtual environment"
 
-if [ ! -d ".venv" ]; then
-    python3 -m venv --system-site-packages .venv
+if [ -d ".venv" ]; then
+    rm -rf .venv
 fi
+
+python3 -m venv --system-site-packages .venv
 
 source .venv/bin/activate
 
 # Install dependencies
 echo "Installing dependencies"
 python3 -m pip install -r requirements.txt
+pip install --no-deps pyrender==0.1.45
+pip install --no-deps PyOpenGL==3.1.6
 
 echo "Dependencies finished installing"
 
