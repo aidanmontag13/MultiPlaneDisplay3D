@@ -19,12 +19,10 @@ def set_backlight(value):
 def write_camera_offset_file(rotation):
 
     user = getpass.getuser()
-    media_root = f"/media/{user}"
-
-    # Loop over all USB drives
-    for drive in os.listdir(media_root):
-        drive_path = os.path.join(media_root, drive)
-        calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
+    drive = "mplanedrive"
+    drive_path = f"/media/{user}/{drive}"
+           
+    calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
 
     rotation_euler = rotation.as_euler('xyz', degrees=True)
         

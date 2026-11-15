@@ -7,15 +7,13 @@ import os
 
 from picamera2 import Picamera2
 
-def write_colmap_file(latest_frame, camera_matrix, dist_coeffs):
+def write_colmap_file(file, latest_frame, camera_matrix, dist_coeffs):
         
         user = getpass.getuser()
-        media_root = f"/media/{user}"
-
-        # Loop over all USB drives
-        for drive in os.listdir(media_root):
-            drive_path = os.path.join(media_root, drive)
-            calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
+        drive = "mplanedrive"
+        drive_path = f"/media/{user}/{drive}"
+           
+        calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
 
         fx = camera_matrix[0, 0]
         fy = camera_matrix[1, 1]
