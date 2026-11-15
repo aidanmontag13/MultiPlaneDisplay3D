@@ -371,14 +371,14 @@ def main():
     try:
         headtracker.read_camera_intrinsic_file()
     except(FileNotFoundError, UnboundLocalError):
-        print("no camera calibration file found, beginning calibration")
+        print("no camera intrinsic calibration file found, beginning calibration")
         print()
         subprocess.run(["python", "calibrate_camera_intrinsics.py"])
 
     try:
         headtracker.read_camera_offset_file()
     except(FileNotFoundError, UnboundLocalError):
-        print("no camera calibration file found, beginning calibration")
+        print("no camera offset calibration file found, beginning calibration")
         print()
         subprocess.run(["python", "calibrate_camera_offset.py"])
 
