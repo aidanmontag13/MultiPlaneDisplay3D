@@ -60,6 +60,14 @@ python3 -m pip install -r requirements.txt
 
 echo "Dependencies finished installing"
 
+echo "applying pyrender fixes for pi"
+sudo cp pyrender_fixes/egl.py .venv/Lib/pyrender/platforms/
+sudo cp pyrender_fixes/shader_program.py .venv/Lib/pyrender/
+sudo rm -rf .venv/Lib/pyrender/shaders
+sudo cp -r pyrender_fixes/shaders .venv/Lib/pyrender/
+
+echo "fixes applied"
+
 # Set up systemd service
 echo "Creating multiplane service"
 
