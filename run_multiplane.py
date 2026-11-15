@@ -15,14 +15,12 @@ import getpass
 def downsample_object_textures():
 
     user = getpass.getuser()
-    media_root = f"/media/{user}"
+    drive = "mplanedrive"
+    drive_path = f"/media/{user}/{drive}"
 
     texture_paths = []
 
-    # Loop over all USB drives
-    for drive in os.listdir(media_root):
-        drive_path = os.path.join(media_root, drive)
-        models_folder = os.path.join(drive_path, "models")
+    models_folder = os.path.join(drive_path, "models")
 
     if os.path.isdir(models_folder):
         print(f"Found models folder on USB: {models_folder}")
@@ -51,40 +49,37 @@ def downsample_object_textures():
             cv2.imwrite(texture_path, texture)
 
 def find_usb_files():
-    user = getpass.getuser()
-    media_root = f"/media/{user}"
 
     image_paths = []
     model_paths = []
 
-    # Loop over all USB drives
-    for drive in os.listdir(media_root):
-        drive_path = os.path.join(media_root, drive)
-        images_folder = os.path.join(drive_path, "images")
-        models_folder = os.path.join(drive_path, "models")
+    user = getpass.getuser()
+    drive = "mplanedrive"
+    drive_path = f"/media/{user}/{drive}"
 
-        if os.path.isdir(images_folder):
-            print(f"Found images folder on USB: {images_folder}")
+    images_folder = os.path.join(drive_path, "images")
+    models_folder = os.path.join(drive_path, "models")
+
+    if os.path.isdir(images_folder):
+        print(f"Found images folder on USB: {images_folder}")
 
             # Add all image files (jpg, png, tiff)
-            for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", "*.heic", "*.heif", "*.webp"):
-                image_paths.extend(glob.glob(os.path.join(images_folder, ext)))
-        else:
-            print(f"No images folder found on USB: {drive_path}")
-            continue
+        for ext in ("*.jpg", "*.jpeg", "*.png", "*.tif", "*.tiff", "*.heic", "*.heif", "*.webp"):
+            image_paths.extend(glob.glob(os.path.join(images_folder, ext)))
 
-        if os.path.isdir(models_folder):
-            print(f"Found models folder on USB: {models_folder}")
+    else:
+        print(f"No images folder found on USB: {drive_path}")
 
-            for dirpath, dirnames, filenames in os.walk(models_folder):
-                # Add all model files (obj, glb, fbx)
-                for ext in ("*.obj", "*.glb", ".gltf"):
-                    model_paths.extend(glob.glob(os.path.join(dirpath, ext)))
-        else:
-            print(f"No models folder found on USB: {drive_path}")
+    if os.path.isdir(models_folder):
+        print(f"Found models folder on USB: {models_folder}")
 
-    print("image paths", image_paths)
-    print("model paths", model_paths)
+        for dirpath, dirnames, filenames in os.walk(models_folder):
+            # Add all model files (obj, glb, fbx)
+            for ext in ("*.obj", "*.glb", ".gltf"):
+                model_paths.extend(glob.glob(os.path.join(dirpath, ext)))
+    else:
+        print(f"No models folder found on USB: {drive_path}")
+
 
     return image_paths, model_paths
 

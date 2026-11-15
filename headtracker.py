@@ -18,12 +18,10 @@ import getpass
 def read_camera_intrinsic_file():
 
     user = getpass.getuser()
-    media_root = f"/media/{user}"
-
-    # Loop over all USB drives
-    for drive in os.listdir(media_root):
-        drive_path = os.path.join(media_root, drive)
-        calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
+    drive = "mplanedrive"
+    drive_path = f"/media/{user}/{drive}"
+   
+    calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
         
     with open(calibration_file, 'r') as f:
         lines = f.readlines()
@@ -50,12 +48,10 @@ def read_camera_intrinsic_file():
 
 def read_camera_offset_file():
     user = getpass.getuser()
-    media_root = f"/media/{user}"
-
-    # Loop over all USB drives
-    for drive in os.listdir(media_root):
-        drive_path = os.path.join(media_root, drive)
-        calibration_file = os.path.join(drive_path, "camera_offset_calibration.txt")
+    drive = "mplanedrive"
+    drive_path = f"/media/{user}/{drive}"
+   
+    calibration_file = os.path.join(drive_path, "camera_intrinsic_calibration.txt")
         
     with open(calibration_file, 'r') as f:
         lines = f.readlines()
