@@ -7,7 +7,7 @@ import os
 
 from picamera2 import Picamera2
 
-def write_colmap_file(file, latest_frame, camera_matrix, dist_coeffs):
+def write_colmap_file(latest_frame, camera_matrix, dist_coeffs):
         
         user = getpass.getuser()
         drive = "mplanedrive"
