@@ -44,6 +44,8 @@ def read_camera_intrinsic_file():
             ])
             dist_coeffs = np.array([float(x) for x in parts[8:12]])
 
+    print("found intrinsic calibration file at", calibration_file)
+
     return frame_width, frame_height, camera_matrix, dist_coeffs
 
 def read_camera_offset_file():
@@ -66,6 +68,8 @@ def read_camera_offset_file():
             camera_rotation_z = float(parts[3])
 
             camera_rotation = Rotation.from_euler('xyz', [camera_rotation_x, camera_rotation_y, camera_rotation_z], degrees=True)
+
+    print("found offset calibration file at", calibration_file)
 
     return camera_rotation
 
