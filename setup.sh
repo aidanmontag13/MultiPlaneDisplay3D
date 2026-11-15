@@ -59,8 +59,8 @@ source .venv/bin/activate
 # Install dependencies
 echo "Installing dependencies"
 python3 -m pip install -r requirements.txt
-pip install --no-deps pyrender==0.1.45
-pip install --no-deps PyOpenGL==3.1.6
+pip install pyrender==0.1.45
+pip install PyOpenGL==3.1.6
 
 echo "Dependencies finished installing"
 
