@@ -150,12 +150,12 @@ class MultiplaneCalibrator:
             if head_position is None: # move to default position if no head is found
                 head_position = np.array([-0.03, 0, 1])
 
-            if (np.linalg.norm(head_position - last_hold_position) < 0.03 and not np.allclose(head_position, last_hold_position)): # see that the head position has moved and is within threshold
+            if (np.linalg.norm(head_position - last_hold_position) < 0.05 and not np.allclose(head_position, last_hold_position)): # see that the head position has moved and is within threshold
                 hold_positions.append(head_position)
                 hold_value += 1
                 fail_value = 0
 
-            if np.linalg.norm(head_position - last_hold_position) > 0.03: # if not within threashold, add to fail value
+            if np.linalg.norm(head_position - last_hold_position) > 0.05: # if not within threashold, add to fail value
                 fail_value += 1
             
             if fail_value > 5: # if fails for 5 frames in a row, reset position
