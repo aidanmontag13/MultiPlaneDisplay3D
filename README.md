@@ -73,13 +73,56 @@ Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable
 - USB Drive  https://a.co/d/dX8yHnJ
 - 250 mm CSI cable  https://a.co/d/1fIMcX2
 
-## Setting up the USB drive
+# Construction
+I recommend printing the display using black PLA which which will absorb spill light and improve display contrast. I like to sand, prime and paint the enclosure for aestethic purposes, but this is not neccesary for display functionality. Use a high strength glue or expoxy to adhere the enclosue, base, and cap together.
+
+Follow the cooling fans instructions to attach it to the raspberry pi, then use 4 m2.5 screws to attach the pi the the back of the waveshare display.
+
+<p align="center">
+  <img src="artifacts/construction1.jpg" width="400">
+  <img src="artifacts/construction.jpg" width="153">
+</p>
+
+Use the diisplay power cable and 22 pin connector that came with the display to connect the display to the raspberry pi at the cam1 dsi connector. Then connect the 250mm csi cable into the cam0 connector. This will be plugged into the camera later on.
+
+<p align="center">
+  <img src="artifacts/construction2.jpg" width="300">
+  <img src="artifacts/construction3.jpg" width="300">
+</p>
+
+Slide the pi and display into the enclosure, then use 2 10mm m2.5 screws to screw display into the top of the enclosure, and 2 6mm m2.5 screws to connect the bottom of the enclosure. Depending on the tolerances of your 3d printer you may need to drill into the displays screw holes and use washers to secure the connection.
+
+<p align="center">
+  <img src="artifacts/construction4.jpg" width="200">
+  <img src="artifacts/construction5.jpg" width="200">
+</p>
+
+Cut two peices and semi-reflective, and one peice of fully reflective acrylic to 162x110mm. Slide the semi-reflective peices into the top and middle slots of the display, and the fully reflective peice into the bottom slot.
+
+<p align="center">
+  <img src="artifacts/construction6.jpg" width="200">
+</p>
+
+
+String the 250mm csi cable through the top slot of the camera holder, and connect the camera, then place the camera into the holder.
+
+<p align="center">
+  <img src="artifacts/construction7.jpg" width="400">
+</p>
+
+Glue 4 m2.5 nuts into their corresponding holes on the front of the display. Then use 4 6mm m2.5 screws to attach the display lid to the front. 
+
+<p align="center">
+  <img src="artifacts/construction8.jpg" width="200">
+</p>
+
+# Setting up the USB drive
 For multiplane display, your images, 3d models, and calibration files are stored on a usb drive. This drive must be set up before running the system. Make sure the drive is formatted in the fat32 or ex-fat file system. 
 
 **Make sure the drive is formatted in exfat or fat32, and is named "mdisplaydrive" like below.
 
 <p align="center">
-  <img src="artifacts/usbformat.png" width="500">
+  <img src="artifacts/usbformat.png" width="200">
 </p>
 
 
@@ -91,7 +134,7 @@ Create a "images" folder and "models" folder in the drives root directory. Image
 
 Make sure to plug the usb drive into the blue usb 3.0 port on the raspberry pi before running the display.
 
-## Installation
+# Installation
 
 make sure you are in your user directory (home/username)
 
