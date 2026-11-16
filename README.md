@@ -1,8 +1,8 @@
 # MultiPlaneDisplay
 
-<p align="center">
-  <img src="artifacts/imag1.jpg" width="800">
-</p>
+https://github.com/user-attachments/assets/6ad0dfff-ffce-4bc0-a5d7-d283fe882f0c
+
+
 
 # How does it work?
 Multi-Plane Display is a D.I.Y volumetric display system that adds depth to traditional photos and displays 3d models in full glasses free 3D.
