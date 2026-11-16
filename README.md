@@ -11,16 +11,16 @@ Multi-Plane Display is a D.I.Y volumetric display system that adds depth to trad
   <img src="artifacts/graphic.png" width="800">
 </p>
 
-## 2.5D Workflow
+## Workflow
 
 1. **Depth segmentation**  
-   A depth map is extracted from the image using *Depth Anything v2*, or by accesing the depth buffer of the internal renderer, and used to segment the scene into **foreground**, **middleground**, and **background** layers.
+   A depth map is extracted from the image using *Depth Anything v2*, or by accesing the depth buffer of the 3D renderer. This depth map is used to segment the scene into **foreground**, **middleground**, and **background** layers.
 
 2. **Viewer tracking**  
    Monocular head tracking estimates the viewer’s position relative to the display.
 
 3. **Perspective correction**  
-   Dynamic warping is applied to plane based on the viewer’s position to aling perspective and prevent off-axis ghosting artifacts.
+   Dynamic warping is applied to each plane based on the viewer’s position to align perspective and prevent off-axis ghosting artifacts.
 
 4. **Optical display**  
    The layered images are displayed through a parascope mirror array, producing the virtual display stacking effect.
