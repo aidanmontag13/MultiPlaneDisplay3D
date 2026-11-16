@@ -16,7 +16,7 @@ import glob
 import getpass
 
 def read_camera_intrinsic_file():
-
+    ### Function to read intrinsic file from usb drive
     user = getpass.getuser()
     drive = "mplanedrive"
     drive_path = f"/media/{user}/{drive}"
