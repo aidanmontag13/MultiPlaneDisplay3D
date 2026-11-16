@@ -7,6 +7,11 @@ import os
 
 from picamera2 import Picamera2
 
+def set_backlight(value):
+    for path in glob.glob("/sys/class/backlight/*/brightness"):
+        with open(path, "w") as f:
+            f.write(str(value))
+
 def write_colmap_file(latest_frame, camera_matrix, dist_coeffs):
         
         user = getpass.getuser()
@@ -178,12 +183,14 @@ class CameraCalibrator:
         distribution_percentage = (current_distribution / total_distribution) * 100
         print(f"Current corner distribution: {distribution_percentage:.2f}%", end="\r", flush=True)
 
-        if distribution_percentage >= 85:  # Threshold for sufficient distribution
+        if distribution_percentage >= 90:  # Threshold for sufficient distribution
             print("Enough checkerboard corners have been detected across the frame)")
             self.stop_event.set()
 
 
     def calibrate_camera(self):
+        set_backlight(100)
+        
         self.stop_event = threading.Event()
 
         camera_thread = threading.Thread(target=self.camera_worker)

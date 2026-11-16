@@ -73,7 +73,25 @@ Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable
 - USB Drive  https://a.co/d/dX8yHnJ
 - 250 mm CSI cable  https://a.co/d/1fIMcX2
 
-### Installation
+## Setting up the USB drive
+For multiplane display, your images, 3d models, and calibration files are stored on a usb drive. This drive must be set up before running the system. Make sure the drive is formatted in the fat32 or ex-fat file system. 
+
+**Make sure the drive is formatted in exfat or fat32, and is named "mdisplaydrive" like below.
+
+<p align="center">
+  <img src="artifacts/usbformat.png" width="500">
+</p>
+
+
+Create a "images" folder and "models" folder in the drives root directory. Image files can be placed directly into the images folder. 3D models must be placed in a unique folder in the models folder containing the .obj, .mtl, and .jpg texture file.
+
+<p align="center">
+  <img src="artifacts/usbfolder.png" width="500">
+</p>
+
+Make sure to plug the usb drive into the blue usb 3.0 port on the raspberry pi before running the display.
+
+## Installation
 
 make sure you are in your user directory (home/username)
 
@@ -83,14 +101,6 @@ cd MultiPlaneDisplay3D
 bash setup.sh
 ```
 
-# Setting up the USB drive
-For multiplane display, your images, 3d models, and calibration files are storred on a usb drive. This drive must be set up before running the system. Make sure the drive is formatted in the fat32 or ex-fat file system. Create a "images" folder and "models" folder in the drives root directory. Image files can be placed directly into the images folder. 3D models must be placed in a unique folder in the models folder containing the .obj, .mtl, and .jpg texture file.
-
-<p align="center">
-  <img src="artifacts/usbfolder.png" width="500">
-</p>
-
-Make sure to plug the usb drive into the blue usb 3.0 port on the raspberry pi.
 
 # Calibration
 
