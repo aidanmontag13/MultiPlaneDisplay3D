@@ -1,5 +1,5 @@
 # Ignore everything inside images/
-#images/*
+images/
 outputs/*
 venv/
 env/
@@ -8,5 +8,8 @@ env/
 display_calibration.txt
 cameras.txt
 *.pyc
+__pycache__/
+3Dmodels/
+image2mesh.py
 
 
