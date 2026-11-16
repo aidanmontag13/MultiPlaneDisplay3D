@@ -1,8 +1,8 @@
 # MultiPlaneDisplay
 
-<p align="center">
-  <img src="artifacts/imag1.jpg" width="800">
-</p>
+https://github.com/user-attachments/assets/6ad0dfff-ffce-4bc0-a5d7-d283fe882f0c
+
+
 
 # How does it work?
 Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable any photo to be viewed with real depth, creating a "2 and a half D" illusion.
