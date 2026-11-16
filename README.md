@@ -80,7 +80,7 @@ Follow the cooling fans instructions to attach it to the raspberry pi, then use 
 
 <p align="center">
   <img src="artifacts/construction1.jpg" width="400">
-  <img src="artifacts/construction.jpg" width="153">
+  <img src="artifacts/construction.jpg" width="300">
 </p>
 
 Use the diisplay power cable and 22 pin connector that came with the display to connect the display to the raspberry pi at the cam1 dsi connector. Then connect the 250mm csi cable into the cam0 connector. This will be plugged into the camera later on.
@@ -100,7 +100,7 @@ Slide the pi and display into the enclosure, then use 2 10mm m2.5 screws to scre
 Cut two peices and semi-reflective, and one peice of fully reflective acrylic to 162x110mm. Slide the semi-reflective peices into the top and middle slots of the display, and the fully reflective peice into the bottom slot.
 
 <p align="center">
-  <img src="artifacts/construction6.jpg" width="200">
+  <img src="artifacts/construction6.jpg" width="400">
 </p>
 
 
@@ -113,7 +113,7 @@ String the 250mm csi cable through the top slot of the camera holder, and connec
 Glue 4 m2.5 nuts into their corresponding holes on the front of the display. Then use 4 6mm m2.5 screws to attach the display lid to the front. 
 
 <p align="center">
-  <img src="artifacts/construction8.jpg" width="200">
+  <img src="artifacts/construction8.jpg" width="400">
 </p>
 
 # Setting up the USB drive
