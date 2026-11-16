@@ -5,21 +5,22 @@
 </p>
 
 # How does it work?
-Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable any photo to be viewed with real depth, creating a "2 and a half D" illusion.
+Multi-Plane Display is a D.I.Y volumetric display system that adds depth to traditional photos and displays 3d models in full glasses free 3D.
+
 <p align="center">
   <img src="artifacts/graphic.png" width="800">
 </p>
 
-## Workflow
+## 2.5D Workflow
 
 1. **Depth segmentation**  
-   A depth map is extracted from the image using *Depth Anything v2* and used to segment the scene into **foreground**, **middleground**, and **background** layers.
+   A depth map is extracted from the image using *Depth Anything v2*, or by accesing the depth buffer of the internal renderer, and used to segment the scene into **foreground**, **middleground**, and **background** layers.
 
 2. **Viewer tracking**  
    Monocular head tracking estimates the viewer’s position relative to the display.
 
-3. **Shadow correction**  
-   Shadow maps are dynamically adjusted based on the viewer’s position to prevent off-axis ghosting artifacts.
+3. **Perspective correction**  
+   Dynamic warping is applied to plane based on the viewer’s position to aling perspective and prevent off-axis ghosting artifacts.
 
 4. **Optical display**  
    The layered images are displayed through a parascope mirror array, producing the virtual display stacking effect.
@@ -50,7 +51,7 @@ Multi-Plane Display uses image processing and Pepper's Ghost illusions to enable
 </p>
 
 <p align="center">
-  <img src="artifacts/imag2.jpg" width="500">
+  <img src="artifacts/imag1.jpg" width="500">
 </p>
 
 ## Features
